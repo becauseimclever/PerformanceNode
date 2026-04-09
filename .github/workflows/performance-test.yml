@@ -1,0 +1,175 @@
+name: Performance Tests
+
+on:
+  # Run on a schedule (daily at 02:00 UTC).
+  schedule:
+    - cron: "0 2 * * *"
+  # Allow manual triggering from the GitHub UI.
+  workflow_dispatch:
+    inputs:
+      test_profile:
+        description: "Test profile to run"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - cpu
+          - memory
+          - network
+          - io
+          - http
+          - stress
+
+# Restrict GITHUB_TOKEN to the minimum permissions needed.
+permissions:
+  contents: read
+  actions: write   # required to upload artifacts
+
+# Only one performance test run at a time on the Pi.
+concurrency:
+  group: performance-tests
+  cancel-in-progress: false
+
+jobs:
+  # ── CPU benchmark ─────────────────────────────────────────────────────────
+  cpu-benchmark:
+    name: "CPU Benchmark (sysbench)"
+    runs-on: [self-hosted, performancenode]
+    if: >
+      github.event_name == 'schedule' ||
+      inputs.test_profile == 'all' ||
+      inputs.test_profile == 'cpu'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build performance image
+        run: |
+          docker build \
+            --target sysbench \
+            -t performancenode/sysbench:latest \
+            docker/performance/
+
+      - name: Run CPU benchmark
+        run: |
+          mkdir -p /opt/performancenode/results/performance
+          docker run --rm \
+            -e SYSBENCH_TEST=cpu \
+            -e SYSBENCH_THREADS=$(nproc) \
+            -e SYSBENCH_TIME=60 \
+            -v /opt/performancenode/results/performance:/results \
+            performancenode/sysbench:latest
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-benchmark-${{ github.run_number }}
+          path: /opt/performancenode/results/performance/sysbench-cpu-*.json
+          retention-days: 90
+
+  # ── Memory benchmark ──────────────────────────────────────────────────────
+  memory-benchmark:
+    name: "Memory Benchmark (sysbench)"
+    runs-on: [self-hosted, performancenode]
+    if: >
+      github.event_name == 'schedule' ||
+      inputs.test_profile == 'all' ||
+      inputs.test_profile == 'memory'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build performance image
+        run: |
+          docker build \
+            --target sysbench \
+            -t performancenode/sysbench:latest \
+            docker/performance/
+
+      - name: Run memory benchmark
+        run: |
+          mkdir -p /opt/performancenode/results/performance
+          docker run --rm \
+            -e SYSBENCH_TEST=memory \
+            -e SYSBENCH_THREADS=$(nproc) \
+            -e SYSBENCH_TIME=60 \
+            -v /opt/performancenode/results/performance:/results \
+            performancenode/sysbench:latest
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: memory-benchmark-${{ github.run_number }}
+          path: /opt/performancenode/results/performance/sysbench-memory-*.json
+          retention-days: 90
+
+  # ── Stress test ────────────────────────────────────────────────────────────
+  stress-test:
+    name: "Stress Test (stress-ng)"
+    runs-on: [self-hosted, performancenode]
+    if: >
+      github.event_name == 'schedule' ||
+      inputs.test_profile == 'all' ||
+      inputs.test_profile == 'stress'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build stress-ng image
+        run: |
+          docker build \
+            --target stress-ng \
+            -t performancenode/stress-ng:latest \
+            docker/performance/
+
+      - name: Run stress test
+        run: |
+          mkdir -p /opt/performancenode/results/performance
+          docker run --rm \
+            -e STRESS_TIMEOUT=120s \
+            -e STRESS_CPU=$(nproc) \
+            -e STRESS_VM=1 \
+            -e STRESS_VM_BYTES=512m \
+            -v /opt/performancenode/results/performance:/results \
+            performancenode/stress-ng:latest
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-${{ github.run_number }}
+          path: /opt/performancenode/results/performance/stress-ng-*.json
+          retention-days: 90
+
+  # ── Summary ────────────────────────────────────────────────────────────────
+  summarize:
+    name: "Summarize Results"
+    runs-on: [self-hosted, performancenode]
+    needs: [cpu-benchmark, memory-benchmark, stress-test]
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate summary
+        run: |
+          echo "## Performance Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Run:** ${{ github.run_number }} | **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Test | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ---- | ------ |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| CPU Benchmark    | ${{ needs.cpu-benchmark.result }}    |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Memory Benchmark | ${{ needs.memory-benchmark.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Stress Test      | ${{ needs.stress-test.result }}      |" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Recent CPU Results" >> "$GITHUB_STEP_SUMMARY"
+          LATEST=$(ls -t /opt/performancenode/results/performance/sysbench-cpu-*.json 2>/dev/null | head -1)
+          if [[ -n "$LATEST" ]]; then
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat "$LATEST" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "_No CPU results available._" >> "$GITHUB_STEP_SUMMARY"
+          fi

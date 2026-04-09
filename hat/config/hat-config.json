@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "description": "GP2040-CE Latency Test HAT configuration",
+  "gpio": {
+    "button_signal_pin": 4,
+    "trigger_output_pin": 17,
+    "status_led_pin": 27,
+    "active_high": true,
+    "debounce_ms": 1
+  },
+  "usb": {
+    "gp2040ce_vid": "0x2E8A",
+    "gp2040ce_pid": "0x0005"
+  },
+  "latency_test": {
+    "sample_count": 1000,
+    "warmup_samples": 50,
+    "trigger_interval_ms": 100,
+    "timeout_ms": 500,
+    "results_dir": "/opt/performancenode/results/latency"
+  }
+}

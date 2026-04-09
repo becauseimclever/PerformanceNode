@@ -1,0 +1,131 @@
+name: GP2040-CE Latency Tests
+
+on:
+  # Run on a schedule (daily at 03:00 UTC, after performance tests).
+  schedule:
+    - cron: "0 3 * * *"
+  # Allow manual triggering.
+  workflow_dispatch:
+    inputs:
+      sample_count:
+        description: "Number of latency samples"
+        required: false
+        default: "1000"
+      warmup_samples:
+        description: "Number of warmup samples to discard"
+        required: false
+        default: "50"
+
+# Restrict GITHUB_TOKEN to the minimum permissions needed.
+permissions:
+  contents: read
+  actions: write   # required to upload artifacts
+
+# Only one latency test at a time (exclusive hardware access).
+concurrency:
+  group: latency-tests
+  cancel-in-progress: false
+
+jobs:
+  latency-test:
+    name: "GP2040-CE Input Latency Test"
+    runs-on: [self-hosted, performancenode]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Verify HAT and GP2040-CE device are present ──────────────────────
+      - name: Verify GP2040-CE device
+        run: |
+          echo "Checking for GP2040-CE USB device..."
+          if ! lsusb | grep -qi "2e8a"; then
+            echo "::error::GP2040-CE device not found. Ensure it is connected via USB."
+            exit 1
+          fi
+          echo "GP2040-CE device detected."
+
+          echo "Checking GPIO access..."
+          if [[ ! -e /dev/gpiomem ]] && [[ ! -e /dev/mem ]]; then
+            echo "::warning::GPIO device not found. HAT may not be connected."
+          fi
+
+      # ── Set up Python environment ─────────────────────────────────────────
+      - name: Set up Python virtual environment
+        run: |
+          VENV="/opt/performancenode/venv"
+          if [[ ! -d "$VENV" ]]; then
+            python3 -m venv "$VENV"
+          fi
+          "$VENV/bin/pip" install --upgrade pip --quiet
+          "$VENV/bin/pip" install RPi.GPIO gpiozero lgpio --quiet
+
+      # ── Override config with workflow inputs ──────────────────────────────
+      - name: Prepare test configuration
+        run: |
+          CONFIG_SRC="hat/config/hat-config.json"
+          CONFIG_TMP="/tmp/hat-config-run.json"
+
+          SAMPLE_COUNT="${{ inputs.sample_count || '1000' }}"
+          WARMUP="${{ inputs.warmup_samples || '50' }}"
+
+          jq \
+            --argjson sc "$SAMPLE_COUNT" \
+            --argjson ws "$WARMUP" \
+            '.latency_test.sample_count = $sc | .latency_test.warmup_samples = $ws' \
+            "$CONFIG_SRC" > "$CONFIG_TMP"
+
+          echo "Running with sample_count=${SAMPLE_COUNT}, warmup=${WARMUP}"
+
+      # ── Run latency test ──────────────────────────────────────────────────
+      - name: Run latency test
+        run: |
+          OUT_DIR="/opt/performancenode/results/latency"
+          mkdir -p "$OUT_DIR"
+
+          /opt/performancenode/venv/bin/python3 hat/latency_test.py \
+            --config /tmp/hat-config-run.json \
+            --output "$OUT_DIR"
+
+      # ── Upload raw results ────────────────────────────────────────────────
+      - name: Upload latency results
+        uses: actions/upload-artifact@v4
+        with:
+          name: latency-results-${{ github.run_number }}
+          path: /opt/performancenode/results/latency/latency-*.json
+          retention-days: 365
+
+      # ── Write step summary ────────────────────────────────────────────────
+      - name: Generate summary
+        if: always()
+        run: |
+          LATEST=$(ls -t /opt/performancenode/results/latency/latency-*.json 2>/dev/null | head -1)
+
+          echo "## GP2040-CE Latency Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Run:** ${{ github.run_number }} | **Date:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -n "$LATEST" ]]; then
+            MEAN=$(jq   '.latency_ms.mean'   "$LATEST")
+            MEDIAN=$(jq '.latency_ms.median' "$LATEST")
+            P95=$(jq    '.latency_ms.p95'    "$LATEST")
+            P99=$(jq    '.latency_ms.p99'    "$LATEST")
+            STDEV=$(jq  '.latency_ms.stdev'  "$LATEST")
+            TIMEOUTS=$(jq '.timeout_count'   "$LATEST")
+            SAMPLES=$(jq  '.sample_count'    "$LATEST")
+
+            echo "| Metric             | Value (ms) |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| ------------------ | ---------- |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Mean               | ${MEAN}    |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Median             | ${MEDIAN}  |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Std Dev            | ${STDEV}   |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| p95                | ${P95}     |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| p99                | ${P99}     |" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "**Samples:** ${SAMPLES} | **Timeouts:** ${TIMEOUTS}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::No latency result file found."
+            echo "_No results available._" >> "$GITHUB_STEP_SUMMARY"
+          fi

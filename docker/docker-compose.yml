@@ -1,0 +1,56 @@
+services:
+  # ── wrk – HTTP benchmarking ────────────────────────────────────────────────
+  wrk:
+    build:
+      context: ./performance
+      target: wrk
+    image: performancenode/wrk:latest
+    container_name: perf-wrk
+    network_mode: host
+    volumes:
+      - ./results:/results
+    environment:
+      - RESULT_DIR=/results
+    profiles: ["http"]
+
+  # ── iperf3 – network throughput ────────────────────────────────────────────
+  iperf3:
+    build:
+      context: ./performance
+      target: iperf3
+    image: performancenode/iperf3:latest
+    container_name: perf-iperf3
+    network_mode: host
+    volumes:
+      - ./results:/results
+    environment:
+      - RESULT_DIR=/results
+    profiles: ["network"]
+
+  # ── stress-ng – CPU / memory / I/O stress ─────────────────────────────────
+  stress-ng:
+    build:
+      context: ./performance
+      target: stress-ng
+    image: performancenode/stress-ng:latest
+    container_name: perf-stress-ng
+    volumes:
+      - ./results:/results
+    environment:
+      - RESULT_DIR=/results
+    profiles: ["stress"]
+
+  # ── sysbench – CPU / memory / I/O benchmarks ──────────────────────────────
+  sysbench:
+    build:
+      context: ./performance
+      target: sysbench
+    image: performancenode/sysbench:latest
+    container_name: perf-sysbench
+    volumes:
+      - ./results:/results
+    environment:
+      - RESULT_DIR=/results
+    profiles: ["cpu", "memory", "io"]
+
+volumes: {}

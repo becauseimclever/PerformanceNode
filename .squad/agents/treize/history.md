@@ -78,3 +78,28 @@ _Appended during sessions._
 **Delegated to Wufei:** Measure cache hit rates (NuGet restore time, ccache stats), monitor cache size growth, establish warm-vs-cold baselines for Docker image pulls and NuGet restores, evaluate ccache compression overhead on Cortex-A76.
 
 **Pattern learned:** On a single-purpose runner, prefer the simplest caching mechanism that avoids running additional services. Directory caches + bind mounts beat local package servers. Bake static toolchains into Docker images (versioned, immutable); persist mutable build caches on the host (ccache). The container hooks wrapper is the single integration point for transparent cache injection — keeps workflows clean and caching concerns centralized.
+
+### 2026-04-11: GPIO MCU flash & test architecture designed (0006)
+
+**What was designed:**
+- `docs/specs/0006-gpio-mcu-flash-test-action.md` — Full spec for a GitHub Action that flashes firmware to 4 MCUs on a custom HAT via SWD and collects test results over UART
+- `docs/hardware/hat-design-contract.md` — Hardware/software interface spec defining the GPIO pin contract, power requirements, and mechanical constraints for the HAT Fortinbra is designing
+- `.squad/decisions/inbox/treize-gpio-mcu-architecture.md` — Three key architectural decisions
+
+**Key architectural decisions:**
+
+1. **Container device passthrough via hook wrapper** — Extend the existing `cache-hook-wrapper.js` to inject `--device` flags for `/dev/gpiochip4` and `/dev/ttyAMA*` into job containers. Natural extension of existing infrastructure, no new services or privileged containers.
+
+2. **SWD flashing via GPIO using OpenOCD `linuxgpiod`** — All flashing routes through the 40-pin header. No USB connections needed. 3 GPIO pins per MCU (SWDIO + SWCLK + RESET) × 4 MCUs = 12 pins. Clean HAT design. Rejected BOOTSEL+USB (can't route USB through GPIO header) and picotool (same USB problem).
+
+3. **4 dedicated hardware UARTs** — Pi 5's RP1 provides PL011 UARTs. One per MCU: UART0, UART2, UART3, UART4 via device tree overlays. Deterministic device paths (`/dev/ttyAMA*`), no USB-UART adapters. 115200 8N1 per Wufei's protocol spec.
+
+**GPIO budget:** 24 of 28 pins allocated (8 UART, 12 SWD+RESET, 4 status LEDs). GPIO 0–1 reserved for HAT EEPROM, 2–3 reserved for future I2C1 expansion.
+
+**Pattern learned:** When designing for a Pi HAT, route ALL signals through the 40-pin GPIO header. USB cannot pass through the header, so any approach requiring USB (BOOTSEL flashing, USB-UART adapters) forces external cables or on-HAT USB hubs — both mechanically fragile and ugly. SWD + hardware UARTs keep everything on the PCB.
+
+**Pattern learned:** The container hook wrapper is the single integration point for ALL host-to-container resource injection — caches, devices, environment variables. Adding new resource types (GPIO, UART) is a natural extension, not a new mechanism. This pattern scales well: one wrapper, one configuration surface, one place to audit security.
+
+**Pattern learned:** For hardware interface contracts, define the GPIO pin table FIRST and make it authoritative. The HAT PCB designer and the software team both reference the same table. Include physical-layer details (pull-up values, series resistors, current limits) that software engineers wouldn't normally specify — the hardware engineer needs them and won't find them in code.
+
+**Status:** Spec 0006 is in **📝 Draft** status. Requires GitHub issue creation and review before implementation starts. HAT design contract delivered to Fortinbra. Delegated to Heero (implementation) and Noin (validation).

@@ -202,6 +202,32 @@
 
 ---
 
+### 2026-04-11: GPIO MCU flash & test architecture
+**By:** Treize (Lead)  
+**What:** Complete architecture for flashing firmware to 4 MCUs (2× RP2040, 1× RP2350B, 1× RP2350A) on a custom Pi HAT and collecting test results via UART, all from within containerized GitHub Actions jobs.
+
+**Three key decisions:**
+
+1. **Container device passthrough via hook wrapper** — Extend `cache-hook-wrapper.js` to inject `--device=/dev/gpiochip4 --device=/dev/ttyAMA0` (etc.) into every job container's `createOptions`. No new services, no privileged containers, no host step bypass. Natural extension of existing cache injection architecture. Rejected: host step bypass (non-standard), privileged sidecar (over-engineered), systemd socket service (too many moving parts).
+
+2. **SWD flashing via GPIO (OpenOCD + linuxgpiod)** — All MCUs flashed via SWD bit-banged through the 40-pin header using OpenOCD's `linuxgpiod` adapter. 3 GPIO pins per MCU (SWDIO, SWCLK, RESET). Total: 12 pins. No USB connections needed — everything on the HAT PCB. Rejected: BOOTSEL+USB (USB can't route through GPIO header), picotool (same USB limitation).
+
+3. **4 dedicated hardware UARTs** — One Pi 5 PL011 UART per MCU via device tree overlays. UART0 (GPIO15) → RP2040-0, UART2 (GPIO5) → RP2040-1, UART3 (GPIO9) → RP2350B, UART4 (GPIO13) → RP2350A. 115200 8N1. Deterministic `/dev/ttyAMA*` paths. UART1 skipped (Bluetooth conflict risk).
+
+**GPIO budget:** 24 of 28 pins. 8 UART + 12 SWD/RESET + 4 status LEDs. GPIO 0–1 reserved (HAT EEPROM). GPIO 2–3 reserved (future I2C1).
+
+**Deliverables:**
+- Spec: `docs/specs/0006-gpio-mcu-flash-test-action.md`
+- HAT contract: `docs/hardware/hat-design-contract.md`
+- Decision record: `.squad/decisions/inbox/treize-gpio-mcu-architecture.md`
+
+**Delegated to Heero:** Setup script, flash scripts, UART listener, hook wrapper extension, composite action.  
+**Delegated to Wufei:** UART protocol and GitHub summary format (already delivered).  
+**Delegated to Noin:** Hardware validation, timeout/failure edge case testing.  
+**Delegated to Fortinbra:** HAT PCB design per the hardware contract.
+
+---
+
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction

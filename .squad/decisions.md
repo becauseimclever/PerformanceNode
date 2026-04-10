@@ -172,9 +172,35 @@
 - Orchestration — multiple setup scripts scattered; need single entry point
 - User guidance — no example workflows; users need to know how to build .NET on the Pi runner
 
----
+### 2026-04-10: SSH hardening, setup orchestrator, example .NET workflow (Heero)
+**By:** Heero (Infrastructure Dev)  
+**What:** Three deliverables created for SSH security, setup orchestration, and example workflows.
 
-## Governance
+**Files created:**
+1. `scripts/setup/setup-ssh.sh` — SSH hardening: key import + sshd_config hardening
+2. `setup.sh` — Top-level setup orchestrator (single entry point for fresh Pi setup, phased execution)
+3. `examples/workflows/dotnet-test.yml` — Ready-to-copy .NET 10 GitHub Actions workflow
+4. `examples/workflows/README.md` — Index and notes for example workflows
+
+**Key assumptions documented:**
+- Scripts must be run as root for `sshd_config` modification and `sshd` restart
+- `$HOME` resolves to operator's home (use `sudo -u actions-runner` for non-root case)
+- `systemctl restart sshd` (Debian/Bookworm default; alternate: `ssh`)
+- NuGet cache path in workflow resolves through hook wrapper env injection (container sees `/root/.nuget/packages`)
+- `--non-interactive` flag support for CI environments
+- Color output guarded by TTY detection (no pollution of logs)
+
+**Open validation items for Noin:**
+- SSH key import test (fresh Pi, no authorized_keys)
+- Idempotency test (run twice, second run skips without error)
+- Service name verification (sshd vs ssh)
+- Non-interactive flag end-to-end test
+- Setup.sh `--only=<phase>` and `--skip=<phase>` options
+- NuGet env var resolution inside running container (hook wrapper precedence)
+- dotnet-test.yml smoke test on real .NET 10 repo
+- Root vs. non-root execution behavior
+
+---
 
 - All meaningful changes require team consensus
 - Document architectural decisions here

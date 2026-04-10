@@ -1,0 +1,80 @@
+# Project Context
+
+- **Project:** PerformanceNode
+- **What:** Bash/shell setup scripts for a Raspberry Pi 5 running as a GitHub Actions self-hosted performance runner. Starting from a fresh Raspberry Pi OS Lite (latest, 64-bit, headless/Bookworm) install.
+- **Owner:** Fortinbra
+- **Team:** Treize (Lead), Heero (Infrastructure Dev), Wufei (Performance Engineer), Noin (Tester/QA)
+
+## Core Context
+
+Treize initialized as Lead on 2026-04-10.
+
+## Learnings
+
+_Appended during sessions._
+
+### 2026-04-10: Three new feature specs written (0003, 0004, 0005)
+
+**What was written:**
+- `docs/specs/0003-ssh-key-setup.md` — SSH key-based auth configuration for secure, passwordless Pi access
+- `docs/specs/0004-single-entry-point.md` — Top-level `setup.sh` orchestrator to run all setup phases in order, idempotent
+- `docs/specs/0005-csharp-example-workflow.md` — Ready-to-copy GitHub Actions workflow for .NET 10 builds on PerformanceNode runner
+
+**Pattern reinforced:** Spec-driven development continues. All three specs follow the template, define clear acceptance criteria, assign to Heero for implementation, and note that GitHub issues must be created before work begins.
+
+**Status:** All three specs are in **📝 Draft** status. Each requires GitHub issue creation and review before implementation starts.
+
+### 2026-04-10: Container execution architecture decision
+
+**Decision:** All GitHub Actions jobs on the Pi 5 runner execute inside disposable Docker containers via **`ACTIONS_RUNNER_CONTAINER_HOOKS`** — the officially supported GitHub mechanism for self-hosted runner container isolation.
+
+**Key choices:**
+- Rejected explicit `container:` (opt-in only, cannot enforce), ARC/Kubernetes (too heavy), and DIND (overhead + complexity).
+- Runner process is **persistent** (systemd service on host); **containers are disposable per job**.
+- Docker Engine 24.x, ARM64 packages from official Docker apt repo, Debian/Bookworm target.
+- Hook scripts from `@actions/runner-container-hooks` npm package; Node.js required on host.
+- `ACTIONS_RUNNER_CONTAINER_HOOKS` env var set in systemd service unit.
+- `/boot/firmware/cmdline.txt` must include `cgroup_memory=1 cgroup_enable=memory` for container memory limits.
+- Log rotation via `/etc/docker/daemon.json` critical for SD card/SSD longevity.
+- Do NOT install QEMU emulation — fail fast on `amd64`-only images.
+
+**Delegated to Heero:** Docker install, daemon config, cgroup cmdline patch, hooks install, runner systemd unit with env vars.
+
+**Delegated to Wufei:** Establish container overhead baseline; distinguish lifecycle time from benchmark time; account for image cache state, Docker daemon RAM (~50–100 MB), and overlay2 I/O overhead in metrics.
+
+**Pattern learned:** On constrained single-board hardware, always prefer the officially supported lightweight hook mechanism over cluster-oriented solutions (ARC) or nested-container patterns (DIND). The runner is the orchestrator; containers are the isolation boundary.
+
+### 2026-04-10: Spec-driven development process adopted
+
+**Directive from Fortinbra:** "All features should come from a spec, and each spec should be associated with an issue on GitHub."
+
+**What was built:**
+- `docs/specs/README.md` — explains the spec-driven process, lifecycle, naming conventions, and definition of ready.
+- `docs/specs/TEMPLATE.md` — reusable spec template with all required sections (Overview, Problem, Solution, Acceptance Criteria, Out of Scope, Dependencies, Agent Assignment, Notes).
+- `docs/specs/0001-pi5-base-setup.md` — retroactive spec for Heero's Pi 5 base OS setup work (already in progress).
+- `docs/specs/0002-dependency-caching.md` — retroactive spec for Wufei's NuGet/Pico SDK caching strategy (already in progress).
+- Updated `.squad/ceremonies.md` — added Spec Review ceremony as a before-implementation gate.
+- Updated `.squad/routing.md` — added spec routing rules and spec gate rule for the coordinator.
+- `.squad/decisions/inbox/treize-spec-driven-process.md` — decision record.
+
+**Pattern learned:** Retroactive specs are valuable even for work already in progress. Writing acceptance criteria for in-flight work forces clarity on "what does done actually look like?" and catches implicit assumptions before they become bugs. The template's "Out of Scope" section is especially important on a constrained project — it prevents Pi 5 setup from creeping into caching, and caching from creeping into custom image builds.
+
+**Pattern learned:** Spec naming with zero-padded issue numbers (`0001-slug`) keeps `ls` output sorted and scannable. Linking specs to GitHub issues creates a two-way traceability chain: issue → spec → code → PR → issue closed.
+
+### 2026-04-10: Dependency caching architecture decision
+
+**Decision:** All persistent caches live on the host under `/opt/runner-cache/` and are transparently bind-mounted into every disposable job container via a custom container hooks wrapper (`/opt/runner-hooks/cache-hook.js`). No additional services (BaGet, local Docker registry) are needed at this scale.
+
+**Key choices:**
+- **NuGet:** Simple directory cache at `/opt/runner-cache/nuget`, bind-mounted to `/home/runner/.nuget/packages`. `NUGET_PACKAGES` env var injected. No local NuGet server — directory cache is faster and zero-overhead.
+- **Pico SDK:** Hybrid approach — toolchain (GCC, CMake, Ninja, SDK source) baked into a custom Docker image (`performancenode/pico-sdk:<version>`) built locally on the Pi. Build acceleration via ccache at `/opt/runner-cache/ccache`, bind-mounted and capped at 2 GB with compression.
+- **Docker images:** Pre-pull strategy for 2–3 base images. No local registry — not justified at this scale.
+- **Hook wrapper:** Custom `cache-hook.js` wraps the standard `@actions/runner-container-hooks` Docker hook, injecting bind mounts and env vars into every `prepare_job` container spec. `ACTIONS_RUNNER_CONTAINER_HOOKS` systemd env var points to the wrapper.
+- **Permissions:** Cache directories use `chmod 1777` (sticky-bit world-writable) to handle UID mismatch between host and container processes.
+- **Cache invalidation:** NuGet pruned weekly (files unused >30 days); ccache self-manages via LRU with size cap; Pico SDK image rebuilt on version bumps.
+
+**Delegated to Heero:** Create host directories, implement cache-hook.js wrapper, build Pico SDK Docker image, write pre-pull and cron scripts, update systemd unit.
+
+**Delegated to Wufei:** Measure cache hit rates (NuGet restore time, ccache stats), monitor cache size growth, establish warm-vs-cold baselines for Docker image pulls and NuGet restores, evaluate ccache compression overhead on Cortex-A76.
+
+**Pattern learned:** On a single-purpose runner, prefer the simplest caching mechanism that avoids running additional services. Directory caches + bind mounts beat local package servers. Bake static toolchains into Docker images (versioned, immutable); persist mutable build caches on the host (ccache). The container hooks wrapper is the single integration point for transparent cache injection — keeps workflows clean and caching concerns centralized.

@@ -1,0 +1,7 @@
+{
+  "version": "1.0",
+  "allowlist": ["gundam-wing"],
+  "selected_universe": "gundam-wing",
+  "capacity": 10,
+  "overflow_strategy": ["diegetic_expansion", "thematic_promotion", "structural_mirroring"]
+}

@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "assignments": [
+    {
+      "assignment_id": "performancenode-001",
+      "universe": "gundam-wing",
+      "created_at": "2026-04-10T02:56:22.108Z",
+      "agents": ["Treize", "Heero", "Wufei", "Noin"]
+    }
+  ]
+}

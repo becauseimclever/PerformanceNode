@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "agents": [
+    {
+      "persistent_name": "Treize",
+      "universe": "gundam-wing",
+      "role": "Lead",
+      "created_at": "2026-04-10T02:56:22.108Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Heero",
+      "universe": "gundam-wing",
+      "role": "Infrastructure Dev",
+      "created_at": "2026-04-10T02:56:22.108Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Wufei",
+      "universe": "gundam-wing",
+      "role": "Performance Engineer",
+      "created_at": "2026-04-10T02:56:22.108Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Noin",
+      "universe": "gundam-wing",
+      "role": "Tester/QA",
+      "created_at": "2026-04-10T02:56:22.108Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  ]
+}

@@ -30,3 +30,28 @@ Heero initialized as Infrastructure Dev on 2026-04-10.
 - `examples/workflows/dotnet-test.yml` — Ready-to-copy GitHub Actions workflow for .NET 10 on this runner.  Uses `container: mcr.microsoft.com/dotnet/sdk:10.0` with ACTIONS_RUNNER_CONTAINER_HOOKS.  NuGet cache provided automatically via host mount at `/root/.nuget/packages`; no `actions/cache` step needed.  Uploads TRX test results as an artifact (always, even on failure).
 - `examples/workflows/README.md` — Index of example workflows with cache mount table and runner label notes.
 - Path note: the task spec referenced `/opt/runner-cache/nuget` as the NuGet env var path, but the actual cache scripts use `/opt/cache/nuget` (host) → `/root/.nuget/packages` (container) as the canonical path.  The workflow uses `/root/.nuget/packages` (the container-visible path set by the hook wrapper) and documents this clearly.  Open item for Noin: verify the env var path resolves correctly when the hook wrapper and workflow both set `NUGET_PACKAGES`.
+
+### 2026-04-11: OpenOCD SWD MCU flash system implemented
+
+- **Flash method switched from BOOTSEL USB to OpenOCD SWD.** The new `scripts/mcu/flash-mcu.py` uses Python 3 stdlib only (`subprocess`, `tempfile`, `time`, `pathlib`). No external deps, no USB requirement.
+- **MCU config is hardcoded in flash-mcu.py** as a dict with MCU names → {swdio, swdclk, reset, target_cfg}. Supports rp2040-h, rp2040-d, rp2350b-d, rp2350a-d (Treize's final topology).
+- **GPIO reset control via sysfs** (`/sys/class/gpio/export` and `/sys/class/gpio/gpioN/value`). No gpiozero dependency. Asserts RESET before OpenOCD (LOW), releases after (HIGH).
+- **OpenOCD config generated at runtime** in tmpdir. Inline `interface linuxgpiod` + `source [find target/...]` + `program ... verify reset` + `exit 0`. The `linuxgpiod_jtag_nums` format is `{swdclk} 0 0 {swdio}` (TCO, TDO, TDI, TMS pins).
+- **Action updated: `.github/actions/mcu-test/action.yml`** — new inputs: `firmware-rp2040-h`, `firmware-rp2040-d`, `firmware-rp2350b-d`, `firmware-rp2350a-d` (individual paths). Removed BOOTSEL pins, removed 4 parallel UARTs. Single UART read from harness MCU (`/dev/ttyAMA2`). Flash step no longer calls `pip install` (openocd from apt, pyserial still needed for UART read).
+- **Setup script updated: `scripts/mcu/setup-mcu-deps.sh`** — now installs `openocd`, `libgpiod2`, `gpiod` tools (not gpiozero, RPi.GPIO, pyudev). Requires `gpio` group for `/dev/gpiochip0` access. Removed `plugdev` group (no USB mass-storage). udev rules cleaned: only GPIO and UART device access.
+- **Spec updated: `docs/specs/0006-gpio-mcu-flash-test-action.md`** — pin assignments now match Treize's final architecture (17,27,22 for rp2040-h; 23,24,25 for rp2040-d; 5,6,13 for rp2350b-d; 19,26,16 for rp2350a-d). OpenOCD config syntax corrected from `adapter driver` + `adapter gpio` to `interface linuxgpiod` + `linuxgpiod_jtag_nums`. Removed USB/BOOTSEL references.
+- **Test it locally**: `python3 scripts/mcu/flash-mcu.py --mcu rp2040-h --firmware firmware.elf` (needs openocd + sysfs GPIO access + /dev/gpiochip0).
+
+### 2026-04-11: Cache path fix + spec 0001 base setup scripts implemented
+
+**Task A — Cache path fix:**
+- Migrated all `/opt/cache/` → `/opt/runner-cache/` across every script and README that referenced the old path.
+- Files updated: `scripts/cache/setup-nuget-cache.sh`, `setup-pico-sdk-cache.sh`, `setup-docker-image-cache.sh`, `inject-cache-mounts.sh`, `scripts/cache/README.md`.
+- Also updated `scripts/performance/cache-metrics/measure-nuget-cache.sh`, `measure-pico-sdk-cache.sh`, and `README.md` (same stale paths, Wufei-domain scripts, but canonical path is Treize's architecture call).
+- `setup.sh` had no `/opt/cache/` references — already clean.
+
+**Task B — Spec 0001 setup scripts:**
+- `scripts/setup/setup-system.sh` — apt update/upgrade, baseline packages, cgroup v2 cmdline patch (`/boot/firmware/cmdline.txt`), `actions-runner` user creation (nologin, added to docker group if it exists), hostname to `performance-node`. Prints reboot reminder if cmdline was patched.
+- `scripts/setup/setup-docker.sh` — Official Docker apt repo (Bookworm ARM64), `daemon.json` (overlay2 + json-file log rotation 10m/3), systemd enable, `actions-runner` docker group assignment, optional hello-world verify (skipped with `--non-interactive`).
+- `scripts/setup/setup-runner.sh` — GitHub API latest linux-arm64 release download, extract to `/opt/actions-runner/`, `config.sh --unattended --replace` as `actions-runner` user, `svc.sh install` + systemd enable. Requires `GITHUB_OWNER`, `GITHUB_REPO`, `RUNNER_TOKEN`; prints clear guidance if missing. Idempotent: skips if service already active.
+- `setup.sh` phase stubs for system/docker/runner already existed — removed redundant file-exists guards (handled by `run_script` helper) and updated comment strings from "placeholder" to actual script paths.

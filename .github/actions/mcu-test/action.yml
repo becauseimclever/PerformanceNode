@@ -1,0 +1,144 @@
+name: 'MCU Test'
+description: 'Flash firmware to RP2040/RP2350 MCUs via OpenOCD SWD, read UART test results, and publish a step summary.'
+author: 'PerformanceNode'
+
+inputs:
+  firmware-rp2040-h:
+    description: 'Path to RP2040-H (Harness) firmware file (.elf or .uf2)'
+    required: false
+    default: ''
+  firmware-rp2040-d:
+    description: 'Path to RP2040-D (DUT) firmware file (.elf or .uf2)'
+    required: false
+    default: ''
+  firmware-rp2350b-d:
+    description: 'Path to RP2350B-D (DUT) firmware file (.elf or .uf2)'
+    required: false
+    default: ''
+  firmware-rp2350a-d:
+    description: 'Path to RP2350A-D (DUT) firmware file (.elf or .uf2)'
+    required: false
+    default: ''
+  uart-timeout:
+    description: 'Seconds to wait for aggregated UART results from harness MCU'
+    required: false
+    default: '120'
+  openocd-path:
+    description: 'Path to openocd binary (default: openocd from PATH)'
+    required: false
+    default: 'openocd'
+
+outputs:
+  results-json:
+    description: 'JSON object with per-MCU test results'
+    value: ${{ steps.parse-results.outputs.results-json }}
+  passed:
+    description: 'Number of MCUs that passed'
+    value: ${{ steps.parse-results.outputs.passed }}
+  failed:
+    description: 'Number of MCUs that failed'
+    value: ${{ steps.parse-results.outputs.failed }}
+  summary:
+    description: 'Human-readable one-line summary'
+    value: ${{ steps.parse-results.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    # ── Step 1: Flash firmware to all MCUs via OpenOCD SWD ────────────────────
+    - name: flash
+      id: flash
+      shell: bash
+      run: |
+        set -euo pipefail
+        SCRIPT="${{ github.action_path }}/../../scripts/mcu/flash-mcu.py"
+
+        # Array of MCU targets and their firmware paths
+        declare -A mcu_firmware=(
+          ["rp2040-h"]="${{ inputs.firmware-rp2040-h }}"
+          ["rp2040-d"]="${{ inputs.firmware-rp2040-d }}"
+          ["rp2350b-d"]="${{ inputs.firmware-rp2350b-d }}"
+          ["rp2350a-d"]="${{ inputs.firmware-rp2350a-d }}"
+        )
+
+        FLASH_FAILURES=0
+        FLASHED_TARGETS=()
+
+        for mcu in "${!mcu_firmware[@]}"; do
+          firmware="${mcu_firmware[$mcu]}"
+
+          # Skip if firmware not provided
+          if [ -z "$firmware" ] || [ ! -f "$firmware" ]; then
+            echo "⊘ Skipping $mcu (firmware not found or empty)"
+            continue
+          fi
+
+          echo "::group::Flash $mcu"
+          if python3 "$SCRIPT" --mcu "$mcu" --firmware "$firmware"; then
+            FLASHED_TARGETS+=("$mcu")
+            echo "✓ $mcu flashed successfully"
+          else
+            echo "✗ Failed to flash $mcu"
+            FLASH_FAILURES=$((FLASH_FAILURES + 1))
+          fi
+          echo "::endgroup::"
+        done
+
+        # Save list of successfully flashed targets for UART step
+        printf -v TARGETS_CSV '%s,' "${FLASHED_TARGETS[@]}"
+        TARGETS_CSV="${TARGETS_CSV%,}"
+        echo "FLASHED_TARGETS=$TARGETS_CSV" >> "$GITHUB_ENV"
+
+        if [ "$FLASH_FAILURES" -gt 0 ]; then
+          echo "⚠️  Flash failures: $FLASH_FAILURES"
+        fi
+
+    # ── Step 2: Read UART output from harness MCU ────────────────────────────
+    - name: read-uart
+      id: read-uart
+      shell: bash
+      run: |
+        set -euo pipefail
+        SCRIPT="${{ github.action_path }}/../../scripts/mcu/read-uart.py"
+        UART_OUTPUT_DIR="${RUNNER_TEMP:-/tmp}/mcu-uart-output"
+        mkdir -p "$UART_OUTPUT_DIR"
+
+        # Read from harness MCU only (RP2040-H on /dev/ttyAMA2)
+        UART_DEV="/dev/ttyAMA2"
+        OUTPUT_FILE="$UART_OUTPUT_DIR/harness.txt"
+
+        if [ ! -e "$UART_DEV" ]; then
+          echo "⚠️  UART device $UART_DEV not found — skipping UART read"
+          echo "HARNESS_TIMEOUT=true" >> "$GITHUB_ENV"
+        else
+          echo "Reading UART results from $UART_DEV..."
+
+          if python3 "$SCRIPT" \
+              --target "rp2040-h" \
+              --device "$UART_DEV" \
+              --baud 115200 \
+              --timeout "${{ inputs.uart-timeout }}" \
+              --output-file "$OUTPUT_FILE"; then
+            echo "✓ UART read successful"
+            echo "HARNESS_TIMEOUT=false" >> "$GITHUB_ENV"
+          else
+            echo "⚠️  UART timeout or error"
+            echo "HARNESS_TIMEOUT=true" >> "$GITHUB_ENV"
+          fi
+        fi
+
+        echo "UART_OUTPUT_DIR=$UART_OUTPUT_DIR" >> "$GITHUB_ENV"
+
+    # ── Step 3: Parse results, set outputs, write step summary ───────────────
+    - name: parse-results
+      id: parse-results
+      shell: bash
+      run: |
+        set -euo pipefail
+        SCRIPT="${{ github.action_path }}/../../scripts/mcu/parse-results.py"
+
+        python3 "$SCRIPT" \
+          --targets "${FLASHED_TARGETS:-rp2040-h,rp2040-d,rp2350b-d,rp2350a-d}" \
+          --uart-output-dir "$UART_OUTPUT_DIR" \
+          --github-output "$GITHUB_OUTPUT" \
+          --github-step-summary "$GITHUB_STEP_SUMMARY"

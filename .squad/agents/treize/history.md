@@ -295,3 +295,11 @@ Next: Await Fortinbra's new direction. Treize breaks it into specs for Phase 2.
 **Pattern learned:** When pivoting automation strategy, keep the architectural decisions but change the implementation vehicle. The "what" (container hooks, cache design, SSH hardening) remains valid; only the "how" (shell scripts → Ansible) changes. This preserves months of design work while gaining the benefits of the new tooling.
 
 **Status:** Proposal drafted. Awaiting Fortinbra approval before spec writing begins. Spec gate remains in effect — no implementation without `0007-ansible-pi-runner-role.md` spec and linked GitHub issue.
+
+---
+
+## Core Context (Summarized)
+
+**Phase 1 (Archived):** Shell-script-first implementation (specs 0001–0006, full stack). Completed and archived on `archive/main-2026-04-13`.
+
+**Phase 2 (Current):** Ansible-first reboot. Proposal drafted. Awaiting user approval before spec gate proceeds. Architecture decisions (container hooks, caching, SSH) carry forward; implementation vehicle changes from bash to Ansible. No implementation begins until `0007-ansible-pi-runner-role.md` spec written and GitHub issue created.

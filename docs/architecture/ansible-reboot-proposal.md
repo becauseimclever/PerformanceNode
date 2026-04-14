@@ -55,7 +55,7 @@ The PerformanceNode repository may live anywhere (Windows local drive, network p
 
 4. **Run Ansible from WSL terminal**
    ```bash
-   ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
+   ANSIBLE_CONFIG=$PWD/ansible.cfg ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
    ```
 
 ### Why Ubuntu WSL and Not Windows?
@@ -180,20 +180,22 @@ Secrets managed via **Ansible Vault** (encrypted `host_vars` or separate `vault.
 $ ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
 
 # Full Pi 5 runner setup (first run)
-$ ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
+$ ANSIBLE_CONFIG=$PWD/ansible.cfg ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
 
 # Re-run (idempotent — skips completed tasks)
-$ ansible-playbook -i inventories/production playbooks/pi-runner.yml
+$ ANSIBLE_CONFIG=$PWD/ansible.cfg ansible-playbook -i inventories/production playbooks/pi-runner.yml
 
 # Target only Docker role
-$ ansible-playbook -i inventories/production playbooks/pi-runner.yml --tags docker
+$ ANSIBLE_CONFIG=$PWD/ansible.cfg ansible-playbook -i inventories/production playbooks/pi-runner.yml --tags docker
 
 # Limit to single host (future)
-$ ansible-playbook -i inventories/production playbooks/site.yml --limit pi5-runner
+$ ANSIBLE_CONFIG=$PWD/ansible.cfg ansible-playbook -i inventories/production playbooks/site.yml --limit pi5-runner
 
 # INCORRECT: Do NOT run from Windows Command Prompt or PowerShell
 X ansible-playbook -i inventories/production playbooks/pi-runner.yml  # ← Will fail
 ```
+
+When the repository lives on the Windows filesystem and is accessed in WSL via `/mnt/c/...`, Ansible may ignore `ansible.cfg` unless `ANSIBLE_CONFIG` is set explicitly. The commands above assume that explicit export pattern.
 
 
 ---
@@ -220,7 +222,7 @@ The **spec gate** remains in effect:
 2. Each spec links to a GitHub issue
 3. Spec Review ceremony before implementation begins
 
-**Proposed first spec:** `0007-ansible-pi-runner-role.md` — covering the core `pi-runner.yml` playbook and its dependent roles.
+**Approved first spec:** `2-inventory-bootstrap.md` — covering the bootstrap inventory and connectivity verification needed before any role work begins.
 
 ---
 

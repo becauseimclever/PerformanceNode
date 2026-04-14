@@ -64,3 +64,15 @@ Heero initialized as Infrastructure Dev on 2026-04-10.
 - `setup.sh` now points its verify phase at `scripts/verify/verify-setup.sh`; `setup-ssh.sh` targets the intended SSH user home instead of blindly using root's `$HOME`, and restarts `ssh` with `sshd` fallback.
 - Docs/examples/spec text were reconciled with current paths (`/opt/runner-cache`), current runner labels (`self-hosted,linux,arm64,performancenode`), and current MCU action inputs.
 - Validation run used `git diff --check` on touched files, `bash -n` for shell scripts, `python -m py_compile` for MCU Python scripts, and `npx js-yaml` for the modified workflow/action YAML.
+
+### 2026-04-14: Stage 1 inventory/bootstrap completed for PiTester
+
+- `inventories/production/hosts.yml` now resolves `pi5-runner` through `pi5_ip` and `pi5_ssh_user`, so the inventory actually targets the current Pi (`PiTester`, `192.168.27.222`, `fortinbra`) instead of trying to SSH to the alias name.
+- `playbooks/ping.yml` now reports the resolved target after `ansible.builtin.ping`, which gives a human-readable confirmation of which host answered without drifting into Stage 2 behavior.
+- WSL validation uncovered an operator trap: when the repo is under `/mnt/c/...`, ansible-core ignores project-local `ansible.cfg` because the directory is world-writable. The reliable pattern is `ANSIBLE_CONFIG=$PWD/ansible.cfg` before inventory/playbook commands, and that guidance is now documented in the Stage 1 docs.
+
+### 2026-04-14: Stage 2 common role implemented
+
+- Added `roles/common/` with split task files for SSH hardening, package installation, locale/timezone setup, and `actions-runner` user + sudoers management. The role is wired through `playbooks/pi-runner.yml` and `playbooks/site.yml`.
+- SSH hardening uses targeted `lineinfile` edits against `/etc/ssh/sshd_config` with `sshd -t` validation before restart, which keeps the role Ansible-native and avoids replacing the whole daemon config for a two-line policy change.
+- The pre-flight SSH safety check is strongest when it tests actual public-key login from the control node (`ssh ... PasswordAuthentication=no`) rather than only checking for an env var like `SSH_AUTH_SOCK`; that catches lockout risk even when operators rely on default key files instead of an agent.

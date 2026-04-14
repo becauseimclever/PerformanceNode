@@ -1,0 +1,18 @@
+---
+common_packages:
+  - ca-certificates
+  - curl
+  - git
+  - gnupg
+  - htop
+  - jq
+  - locales
+  - lsb-release
+  - sudo
+  - unzip
+  - wget
+
+common_locale: en_US.UTF-8
+common_timezone: UTC
+common_ssh_service_name: ssh
+common_sshd_validate_command: /usr/sbin/sshd -t -f %s

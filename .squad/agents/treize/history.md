@@ -227,3 +227,25 @@ Each stage unlocks a capability that the next stage builds on. This creates natu
   - Status: Firm constraint, not preference
 
 **Key learning:** When infrastructure constraints emerge (like "Ansible needs Unix control node"), document them at the architecture level, not just in runbooks. Propagate the constraint through all related docs (proposals, rollout, README) so operators encounter the requirement consistently. Decision record captures why the constraint exists (for future agents' context).
+
+### 2026-04-14: Stage 2 Spec Gate Review and Approval
+
+**Spec:** `docs/specs/3-common-role.md` (Common Base Role)
+
+**Gate criteria reviewed:**
+1. ✅ Template completeness: All 9 sections present
+2. ✅ Acceptance criteria testability: 7 specific, measurable criteria; no vague language
+3. ✅ Agent assignment: Heero (Implement), Treize (Review), Noin (Validate)
+4. ✅ GitHub issue: #3 linked and verified open
+
+**DECISION: APPROVED** for implementation. Spec status updated from "📝 Draft" to "✅ Approved".
+
+**Key spec strengths:**
+- SSH key pre-flight check (lines 161–166) prevents common lockout mistake
+- Idempotency explicitly tested (Criterion 6: `changed=0` on rerun)
+- Clear dependencies: requires Stage 1, enables Stage 3
+- Out of Scope prevents creep (Docker, runner, firewall deferred)
+
+**Pattern reinforced:** Pre-flight checks documented in spec Notes (not just acceptance criteria) are valuable safeguards. Future specs should include "gotchas that could cause failure" even if they can't be unit-tested. Idempotency should always be an explicit acceptance criterion for infrastructure specs.
+
+**Status:** Decision record created at `.squad/decisions/inbox/treize-stage2-approval.md`. Ready for Heero to begin implementation. Treize will review PRs; Noin will validate.

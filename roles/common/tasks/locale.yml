@@ -1,0 +1,39 @@
+---
+- name: Ensure configured locale is generated
+  ansible.builtin.lineinfile:
+    path: /etc/locale.gen
+    regexp: '^#?{{ common_locale | regex_escape }}\s+UTF-8$'
+    line: '{{ common_locale }} UTF-8'
+  notify: Generate locale
+
+- name: Set default locale
+  ansible.builtin.copy:
+    dest: /etc/default/locale
+    content: |
+      LANG={{ common_locale }}
+      LC_ALL={{ common_locale }}
+    mode: '0644'
+
+- name: Verify requested timezone exists
+  ansible.builtin.stat:
+    path: "/usr/share/zoneinfo/{{ common_timezone }}"
+  register: common_timezone_file
+
+- name: Fail when requested timezone is unavailable
+  ansible.builtin.assert:
+    that:
+      - common_timezone_file.stat.exists
+    fail_msg: "Timezone {{ common_timezone }} was not found under /usr/share/zoneinfo"
+
+- name: Set timezone localtime link
+  ansible.builtin.file:
+    src: "/usr/share/zoneinfo/{{ common_timezone }}"
+    dest: /etc/localtime
+    state: link
+    force: true
+
+- name: Persist timezone name
+  ansible.builtin.copy:
+    dest: /etc/timezone
+    content: "{{ common_timezone }}\n"
+    mode: '0644'

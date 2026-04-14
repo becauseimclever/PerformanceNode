@@ -1,0 +1,4 @@
+---
+runner_user: actions-runner
+runner_home: /opt/actions-runner
+cache_base: /opt/runner-cache

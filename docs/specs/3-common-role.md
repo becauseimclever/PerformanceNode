@@ -1,10 +1,10 @@
 # Spec: Common Base Role
 
-**Spec ID:** `0008-common-role`  
+**Spec ID:** `3-common-role`  
 **Stage:** 2 of 8  
-**Status:** 📝 Draft — Awaiting Approval  
+**Status:** ✅ Approved
 **Author:** Treize (Lead)  
-**GitHub Issue:** _Not yet created_
+**GitHub Issue:** [#3](https://github.com/becauseimclever/PerformanceNode/issues/3)
 
 ---
 
@@ -113,7 +113,7 @@ common_packages:
 
 - **Requires:**
   - Stage 1 complete (inventory, connectivity verified)
-  - SSH key already in `~pi/.ssh/authorized_keys` (or you'll lock yourself out!)
+  - SSH key already in the target user's `authorized_keys` (or you'll lock yourself out)
 
 - **Enables:**
   - Stage 3: Docker role (needs `actions-runner` user to add to docker group)
@@ -134,7 +134,7 @@ common_packages:
 ansible-playbook playbooks/pi-runner.yml -i inventories/production --tags common
 
 # Verify SSH hardening (from control machine)
-ssh -o PasswordAuthentication=yes pi@<pi-ip>
+ssh -o PasswordAuthentication=yes fortinbra@192.168.27.222
 # Expected: Permission denied (no password auth)
 
 # Verify user exists (on Pi)
@@ -154,7 +154,7 @@ ansible-playbook playbooks/pi-runner.yml -i inventories/production --tags common
 
 ### SSH Key Warning
 
-**⚠️ CRITICAL:** Before running this role, ensure your SSH public key is already in `~pi/.ssh/authorized_keys`. Disabling password auth without key access will lock you out of the Pi.
+**⚠️ CRITICAL:** Before running this role, ensure your SSH public key is already authorized for the target user. Disabling password auth without key access will lock you out of the Pi.
 
 The role should include a pre-flight check:
 ```yaml

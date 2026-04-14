@@ -1,0 +1,9 @@
+---
+- name: Configure Raspberry Pi runner baseline
+  hosts: pi_runners
+  gather_facts: false
+
+  roles:
+    - role: common
+      tags:
+        - common

@@ -1,0 +1,15 @@
+---
+- name: Create actions-runner user
+  ansible.builtin.user:
+    name: "{{ runner_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+
+- name: Allow actions-runner passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ runner_user }}"
+    content: "{{ runner_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    mode: '0440'
+    validate: 'visudo -cf %s'

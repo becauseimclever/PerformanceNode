@@ -1,6 +1,6 @@
 # PerformanceNode
 
-**Status:** 📋 Planning — Staged rollout approved for Ansible-first architecture.
+**Status:** ✅ Stage 1 complete — Inventory & Bootstrap is validated for the first Pi target.
 
 An **Ansible-based automation framework** for setting up Raspberry Pi 5 as a self-hosted GitHub Actions runner for local performance testing. Designed for reproducibility, idempotency, and extensibility to other network hosts.
 
@@ -10,9 +10,9 @@ Implementation is broken into **8 small stages** for incremental review and appr
 
 | Stage | Name | Status |
 |-------|------|--------|
-| 1 | [Inventory & Bootstrap](docs/specs/0007-inventory-bootstrap.md) | 📝 Draft |
-| 2 | [Common Base](docs/specs/0008-common-role.md) | 📝 Draft |
-| 3 | [Docker Runtime](docs/specs/0009-docker-role.md) | 📝 Draft |
+| 1 | [Inventory & Bootstrap](docs/specs/2-inventory-bootstrap.md) | ✅ Complete |
+| 2 | [Common Base](docs/specs/3-common-role.md) | 📝 Draft |
+| 3 | [Docker Runtime](docs/specs/4-docker-role.md) | 📝 Draft |
 | 4 | GitHub Runner Core | Pending |
 | 5 | Container Hooks | Pending |
 | 6 | Cache Infrastructure | Pending |
@@ -22,6 +22,8 @@ Implementation is broken into **8 small stages** for incremental review and appr
 **Process:** Each stage requires spec approval → GitHub issue → implementation → validation.
 
 ⚠️ **Important:** All Ansible playbook execution must happen inside a Ubuntu WSL terminal, not from Windows. See [`docs/architecture/ansible-reboot-proposal.md`](docs/architecture/ansible-reboot-proposal.md#operator-workflow) for setup instructions.
+
+If the repository is opened from `/mnt/c/...` in WSL, run commands with `ANSIBLE_CONFIG=$PWD/ansible.cfg` so Ansible uses the repo-local configuration file.
 
 See [`docs/architecture/staged-rollout.md`](docs/architecture/staged-rollout.md) for the full plan.
 
@@ -55,8 +57,8 @@ Team structure, decisions, and history: [`.squad/`](.squad/)
 ## Status
 
 - **Prior shell-script implementation:** Archived at `archive/main-2026-04-13`
-- **Current:** Architecture proposal drafted, awaiting approval
-- **Next:** Write spec `0007-ansible-pi-runner-role.md`, then implement
+- **Current:** Stage 1 inventory and bootstrap validation are complete for `PiTester` (`192.168.27.222`) over SSH as `fortinbra`
+- **Next:** Stage 2 can begin after approval
 
 ## Quick Links
 

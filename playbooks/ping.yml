@@ -1,0 +1,12 @@
+---
+- name: Verify connectivity to Raspberry Pi runners
+  hosts: pi_runners
+  gather_facts: false
+
+  tasks:
+    - name: Ping configured runner target
+      ansible.builtin.ping:
+
+    - name: Report resolved bootstrap target
+      ansible.builtin.debug:
+        msg: "Reached {{ pi_hostname }} ({{ ansible_host }}) as {{ ansible_user }}"

@@ -1,0 +1,6 @@
+---
+ansible_become: true
+ansible_become_method: sudo
+ansible_python_interpreter: auto_silent
+
+# Stage 4+ secrets stay out of git; provide them via Ansible Vault or --extra-vars.

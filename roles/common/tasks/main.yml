@@ -1,0 +1,45 @@
+---
+- name: Verify SSH public key access before hardening
+  ansible.builtin.command: >-
+    ssh -o BatchMode=yes
+    -o PreferredAuthentications=publickey
+    -o PasswordAuthentication=no
+    -o StrictHostKeyChecking=yes
+    -p {{ ansible_port | default(22) }}
+    {% if ansible_ssh_private_key_file is defined %}-i {{ ansible_ssh_private_key_file }}{% endif %}
+    {{ ansible_user }}@{{ ansible_host | default(inventory_hostname) }} true
+  delegate_to: localhost
+  connection: local
+  become: false
+  changed_when: false
+  vars:
+    ansible_become: false
+  tags:
+    - common
+    - ssh
+
+- name: Apply SSH hardening
+  ansible.builtin.import_tasks: ssh.yml
+  tags:
+    - common
+    - ssh
+
+- name: Install base packages
+  ansible.builtin.import_tasks: packages.yml
+  tags:
+    - common
+    - packages
+
+- name: Configure locale and timezone
+  ansible.builtin.import_tasks: locale.yml
+  tags:
+    - common
+    - locale
+    - timezone
+
+- name: Create runner user and sudoers
+  ansible.builtin.import_tasks: users.yml
+  tags:
+    - common
+    - users
+    - sudoers

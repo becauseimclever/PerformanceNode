@@ -1,10 +1,10 @@
 # Spec: Docker Runtime Role
 
-**Spec ID:** `0009-docker-role`  
+**Spec ID:** `4-docker-role`  
 **Stage:** 3 of 8  
 **Status:** 📝 Draft — Awaiting Approval  
 **Author:** Treize (Lead)  
-**GitHub Issue:** _Not yet created_
+**GitHub Issue:** [#4](https://github.com/becauseimclever/PerformanceNode/issues/4)
 
 ---
 

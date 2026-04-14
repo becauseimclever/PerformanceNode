@@ -284,6 +284,106 @@ TEST_END mcu=rp2040-0 passed=2 failed=0 skipped=0
 **By:** Heero (Infrastructure Dev)  
 **What:** PerformanceNode will support a **stable compatibility service name** of `actions-runner` even though `svc.sh install` creates the real GitHub runner unit as `actions.runner.<owner>-<repo>.<runner-name>.service`.
 
+---
+
+### 2026-04-13: User directive — Create GitHub issue first
+**By:** Fortinbra (via Copilot)  
+**What:** Going forward, create the GitHub issue first, then create the spec file.
+**Why:** User request — clarifies workflow order to prevent spec drift from issues.
+
+---
+
+### 2026-04-14: User directive — Spec filenames must include GitHub issue number
+**By:** Fortinbra (via Copilot)  
+**What:** Every feature spec must correspond to a GitHub issue, and the spec filename must include the GitHub issue number.
+**Why:** User request — enables traceability and clear linking between development tracking (issues) and design (specs).
+
+---
+
+### 2026-04-14: User directive — Ansible control node must be WSL/Ubuntu
+**By:** Fortinbra (via Copilot)  
+**What:** Ansible should not be run from Windows directly. Use the Ubuntu WSL instance as the Ansible control node.
+**Why:** User requirement — captured for team memory. Ansible modules, SSH, and file permissions require POSIX semantics not available from Windows native shells.
+
+---
+
+### 2026-04-14: WSL `/mnt/c` Ansible config invocation
+**By:** Heero (Infrastructure Dev)  
+**What:** When the repo is run from Ubuntu WSL on a Windows-mounted path such as `/mnt/c/ws/PerformanceNode`, operators must export `ANSIBLE_CONFIG=$PWD/ansible.cfg` before invoking Ansible, or clone the repo into the WSL filesystem instead.  
+**Why:** Real Stage 1 validation showed ansible-core ignores project-local `ansible.cfg` in world-writable directories, which makes inventory-based commands silently fall back to implicit localhost unless the config is passed explicitly.
+
+---
+
+### 2026-04-14: Stage 2 Common Base Role Spec Approved
+**By:** Treize (Lead)  
+**Status:** ✅ APPROVED — Ready for implementation
+**Spec:** `docs/specs/3-common-role.md` (Stage 2)  
+**Issue:** #3 (Stage 2: Common Base)
+
+**Gate criteria review outcome:**
+- ✅ Template completeness: All 9 sections present
+- ✅ Acceptance criteria testability: 7 specific, measurable, testable criteria; no vague language
+- ✅ Agent assignment: Heero (Implement), Treize (Review), Noin (Validate)
+- ✅ GitHub issue: #3 verified open
+
+**Key strengths:**
+- SSH hardening justified by Stage 1 requirement
+- Idempotency explicit (Criterion 6: `changed=0` on second run)
+- SSH pre-flight check (test actual key login) catches operator mistakes before lockout
+- Dependencies clear: Stage 1 prerequisite, Stage 3 enabler
+- Out of Scope prevents creep
+
+**Delegated to:** Heero for implementation; Treize for PR review; Noin for validation
+
+---
+
+### 2026-04-14: Staged Rollout Plan for Ansible Implementation
+**By:** Treize (Lead)  
+**Status:** Proposed and drafted
+**Request:** Fortinbra — "Split implementation into small understandable chunks for incremental approval"
+
+**Decision: Break implementation into 8 stages**, each with spec + GitHub issue + approval gate:
+
+| Stage | Name | Key Deliverable |
+|-------|------|-----------------|
+| 1 | Inventory & Bootstrap | `ansible.cfg`, inventory, connectivity test |
+| 2 | Common Base | `roles/common/` — SSH, packages, runner user |
+| 3 | Docker Runtime | `roles/docker/` — Docker CE, daemon config |
+| 4 | GitHub Runner Core | `roles/github_runner/` — download, register, systemd |
+| 5 | Container Hooks | `roles/runner_hooks/` — Node.js, hooks, wrapper |
+| 6 | Cache Infrastructure | `roles/caching/` — directories, bind mounts |
+| 7 | Validation | Idempotency test, smoke test workflow |
+| 8 | Documentation | README, runbook, architecture docs |
+
+**Rationale:** Each stage 1–2 hours work, reviewable, produces visible output, unblocks next stage. Spec-driven gate respected throughout.
+
+**Artifacts:** `docs/architecture/staged-rollout.md`, `docs/specs/TEMPLATE.md`, Stage 1–3 specs drafted (now numbered 2–4 per issue requirement).
+
+---
+
+### 2026-04-14: WSL/Ubuntu Control Node for Ansible Execution (Decision Record)
+**By:** Treize (Lead)  
+**Status:** Firm constraint
+
+**Decision:** All Ansible playbook execution for PerformanceNode must happen inside Ubuntu WSL terminal, not Windows native shells.
+
+**Rationale:**
+1. Ansible requires POSIX semantics (file permissions, SSH client behavior, shell invocation)
+2. Windows cmd.exe/PowerShell don't provide this; module failures occur
+3. WSL 2 provides full Linux compatibility
+4. SSH key management simpler (Unix filesystem enforces `600` permissions; NTFS incompatible)
+5. Minimal setup (one-time WSL feature; `apt install ansible`)
+
+**Implications:**
+- ansible-reboot-proposal.md updated with "Operator Workflow" section
+- staged-rollout.md updated with prominent ⚠️ warning
+- README.md staged rollout section updated with WSL reminder
+- All future specs assume WSL/Ubuntu control node
+
+**Alternatives rejected:** Windows native Ansible (module behavior differs), Cygwin/MSYS2 (uncommon, still incompatible), move repo to WSL filesystem (limits flexibility), document workarounds (brittle).
+
+**Status:** Firm constraint, not preference.
+
 **Why:**
 - Cache scripts and hook wiring need a deterministic place to stage systemd drop-ins before the runner is registered.
 - Operators need a stable restart/status target that matches the documentation and verification flow.

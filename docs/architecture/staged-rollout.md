@@ -15,6 +15,7 @@ Before beginning ANY stage implementation, ensure:
 2. Ansible is installed in Ubuntu: `sudo apt install ansible openssh-client`
 3. Repository is cloned (to Windows or WSL — both work)
 4. All playbook commands are run from **inside WSL terminal** only
+5. If the repo is under `/mnt/c/...`, use `ANSIBLE_CONFIG=$PWD/ansible.cfg` (or export it first) so ansible-core does not ignore the repo-local config
 
 See [Operator Workflow](ansible-reboot-proposal.md#operator-workflow) in the Ansible Reboot Proposal for detailed setup and typical workflow.
 
@@ -49,7 +50,7 @@ Break the Ansible-first Pi runner implementation into **8 small, understandable 
 
 ## Stage 1: Inventory & Bootstrap
 
-**Spec:** `0007-inventory-bootstrap.md`  
+**Spec:** `2-inventory-bootstrap.md`
 **Goal:** Establish Ansible connectivity to the Pi.
 
 ### Deliverables
@@ -75,7 +76,7 @@ Ansible can reach the Pi over SSH. Foundation for all subsequent stages.
 
 ## Stage 2: Common Base
 
-**Spec:** `0008-common-role.md`  
+**Spec:** `3-common-role.md`
 **Goal:** Secure the OS baseline.
 
 ### Deliverables
@@ -102,7 +103,7 @@ Baseline OS security and user setup complete.
 
 ## Stage 3: Docker Runtime
 
-**Spec:** `0009-docker-role.md`  
+**Spec:** `4-docker-role.md`
 **Goal:** Install and configure Docker for containerized job execution.
 
 ### Deliverables
@@ -287,9 +288,9 @@ For each stage:
 
 | Order | Stage | Spec | First Deliverable |
 |-------|-------|------|-------------------|
-| 1 | Inventory & Bootstrap | `0007-inventory-bootstrap.md` | `ansible.cfg` + inventory |
-| 2 | Common Base | `0008-common-role.md` | `roles/common/` |
-| 3 | Docker Runtime | `0009-docker-role.md` | `roles/docker/` |
+| 1 | Inventory & Bootstrap | `2-inventory-bootstrap.md` | `ansible.cfg` + inventory |
+| 2 | Common Base | `3-common-role.md` | `roles/common/` |
+| 3 | Docker Runtime | `4-docker-role.md` | `roles/docker/` |
 
 These three stages establish connectivity, OS baseline, and container runtime — the minimum for any subsequent work.
 

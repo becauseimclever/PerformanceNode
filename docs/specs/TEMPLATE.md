@@ -1,10 +1,10 @@
 # Spec: {Title}
 
-**Spec ID:** `{NNNN-slug}`  
+**Spec ID:** `{issue}-{slug}`  
 **Stage:** {N} of 8  
 **Status:** 📝 Draft | ✅ Approved | 🚧 In Progress | ✔️ Complete  
 **Author:** {Agent}  
-**GitHub Issue:** _Not yet created_
+**GitHub Issue:** `#{issue}` or linked issue URL
 
 ---
 

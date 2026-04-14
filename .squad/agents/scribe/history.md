@@ -37,3 +37,28 @@ Agent Scribe initialized and ready for work.
 - Stage `scripts/` (setup scripts, benchmarks)
 - Commit with message: "feat: caching strategy, cache scripts, metrics, spec-driven process"
 - Include Copilot co-author trailer (per charter)
+
+### 2026-04-14: Stage 1 & 2 Inventory/Bootstrap and Common Role Completion
+
+**Session:** Stages 1–2 implementation and validation
+
+**Deliverables committed:**
+- **Stage 1:** `ansible.cfg`, `inventories/production/hosts.yml`, `playbooks/ping.yml` — Ansible connectivity to PiTester
+- **Stage 2:** `roles/common/{tasks,handlers,defaults}` — SSH hardening, packages, locale, runner user, passwordless sudo
+- **Playbook structure:** `playbooks/site.yml` (main entry), `playbooks/pi-runner.yml` (Pi-specific)
+- **Spec renumbering:** 0007–0009 → 2–4 (inventory-bootstrap, common-role, docker-role)
+- **Architecture docs updated:** ansible-reboot-proposal, staged-rollout with WSL control node warning
+- **Agent histories updated:** Treize, Heero, Noin with per-session learnings
+
+**Key team learnings documented:**
+- Heero: WSL validation uncovered `ansible.cfg` path gotcha on `/mnt/c/...` (needs `ANSIBLE_CONFIG=$PWD/...`)
+- Heero: SSH pre-flight check (test actual key login) catches operator mistakes before lockout
+- Noin: Stage 1 acceptance verified from Ubuntu WSL; Stage 2 not yet implemented (awaiting Heero)
+- Treize: Stage boundary pattern — each stage produces a verifiable capability (connectivity, base OS, containers, etc.)
+
+**Governance maintained:**
+- Spec-driven gates active: Stage 3 (docker-role) drafted but not implemented until approval
+- No implementation without spec + issue
+- Ansible as primary tool; shell scripts archived to `archive/main-2026-04-13` for reference
+
+**Pattern reinforced:** Spec renumbering (0007→2) signals phase restart. Keeps numbering human-readable and aligns with task-numbering scheme for issue tracking.

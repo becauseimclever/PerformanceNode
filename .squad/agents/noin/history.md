@@ -13,6 +13,16 @@ Noin initialized as Tester/QA on 2026-04-10.
 
 _Appended during sessions._
 
+### 2026-04-14: Stage 1 inventory/bootstrap QA
+
+**Scope:** Reviewed Stage 1 against `docs/specs/2-inventory-bootstrap.md` and validated from Ubuntu WSL.
+
+**Key outcomes:**
+- Ubuntu WSL validation is the correct path; on `/mnt/c/...` Ansible ignores repo-local `ansible.cfg` unless `ANSIBLE_CONFIG=$PWD/ansible.cfg` is set explicitly.
+- `inventories/production/hosts.yml` currently declares only the `pi5-runner` alias and does not set `ansible_host`/`ansible_user`, so Ansible tries to SSH to the literal hostname `pi5-runner` instead of `192.168.27.222`.
+- The committed Pi details in `host_vars/pi5-runner.yml` match the spec (`PiTester`, `192.168.27.222`, `fortinbra`), but those values are not wired into the actual inventory host entry.
+- Result: Stage 1 is not complete yet because the required `ansible-playbook ... playbooks/ping.yml` acceptance check still fails with hostname resolution/unreachable output.
+
 ### 2026-04-13: QA refresh against current tree
 
 **Scope:** Refreshed QA artifacts against the live working tree after earlier rate-limit interruption.
@@ -39,3 +49,13 @@ _Appended during sessions._
 - **From Heero:** Cache scripts are idempotent with `set -euo pipefail`; Noin validates this on real Pi hardware
 - **From Wufei:** Cache-metrics benchmarks provide baseline numbers for cold vs. warm comparison
 - **From Treize:** Specs 0001 and 0002 have 8–10 testable acceptance criteria each; Noin verifies all before signing off
+
+### 2026-04-14: Stage 2 common-role QA baseline
+
+**Scope:** Checked `docs/specs/3-common-role.md` against the current repo state and re-validated the Ansible control path from Ubuntu WSL.
+
+**Key outcomes:**
+- Stage 1 is now verifiable from WSL with `ANSIBLE_CONFIG=$(pwd)/ansible.cfg`; `ansible-playbook -i inventories/production playbooks/ping.yml` succeeds against `PiTester (192.168.27.222)` as `fortinbra`.
+- Stage 2 implementation is not present yet: there is no `roles/common/` tree and no `playbooks/pi-runner.yml`, so none of the Stage 2 acceptance criteria can be executed.
+- Readiness checklist for Heero's handoff: `roles/common/tasks/{main,ssh,packages,locale,users}.yml`, `roles/common/handlers/main.yml`, `roles/common/defaults/main.yml`, optional `roles/common/templates/sshd_config.j2`, a playbook entry point that can run `--tags common`, and tags/idempotent tasks for SSH hardening, packages, locale/timezone, runner user creation, and passwordless sudo.
+- Stage 2 cannot be considered complete until the role exists and WSL validation proves: SSH password auth disabled, root login disabled, packages installed from defaults, timezone set, `actions-runner` in `sudo`, and a second `--tags common` run reports `changed=0`.

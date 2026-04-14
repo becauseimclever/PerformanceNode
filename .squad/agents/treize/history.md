@@ -259,3 +259,39 @@ Rationale: Fortinbra pivot request. All prior work auditable. Clean foundation f
 Key insight: Archival as completion practice. Phase 1 established decision framework (spec-driven, squad structure, patterns). Phase 2 builds with different technical approach if needed.
 
 Next: Await Fortinbra's new direction. Treize breaks it into specs for Phase 2.
+
+### 2026-04-14: Ansible-First Architecture Reboot
+
+**Directive from Fortinbra:** Pivot from shell-script-first to Ansible-first automation. Goals: reproducibility, idempotency, extensibility to other network hosts.
+
+**What was proposed:**
+- `docs/architecture/ansible-reboot-proposal.md` — comprehensive architecture proposal with repo structure, role breakdown, inventory design
+- `.squad/decisions/inbox/treize-ansible-reboot.md` — decision record capturing rationale and implications
+
+**Key architectural choices:**
+- **Ansible as primary tool** — Idempotent by design, declarative YAML, inventory-driven targeting
+- **Standard layout** — `inventories/`, `playbooks/`, `roles/`, `group_vars/`, `host_vars/`
+- **Five core roles for Phase 1:** `common`, `docker`, `github_runner`, `runner_hooks`, `caching`
+- **Phase 1 scope: Pi 5 runner only** — MCU/GPIO, performance metrics, multi-host deferred
+- **Spec-driven process continues** — Next spec: `0007-ansible-pi-runner-role.md`
+
+**What carries forward from shell-script phase:**
+- Container hooks architecture (ACTIONS_RUNNER_CONTAINER_HOOKS)
+- Cache bind-mount design (/opt/runner-cache/*)
+- Docker daemon config (overlay2, log rotation)
+- Cgroup cmdline patch for container memory limits
+- SSH hardening (key-based auth)
+
+**What is deferred:**
+- MCU/GPIO flash infrastructure (Phase 2+)
+- Performance benchmarking suite
+- Additional network hosts (NAS, workstations)
+
+**Open questions for Fortinbra:**
+1. Bootstrap method for initial SSH access (Pi Imager recommended)
+2. Runner token management (Ansible Vault vs runtime env)
+3. Ansible Galaxy collections (community.docker?)
+
+**Pattern learned:** When pivoting automation strategy, keep the architectural decisions but change the implementation vehicle. The "what" (container hooks, cache design, SSH hardening) remains valid; only the "how" (shell scripts → Ansible) changes. This preserves months of design work while gaining the benefits of the new tooling.
+
+**Status:** Proposal drafted. Awaiting Fortinbra approval before spec writing begins. Spec gate remains in effect — no implementation without `0007-ansible-pi-runner-role.md` spec and linked GitHub issue.

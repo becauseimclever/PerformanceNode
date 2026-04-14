@@ -1,20 +1,43 @@
 # PerformanceNode
 
-**Status:** Clean slate — pivoting architecture. See `.squad/decisions/inbox/treize-pivot-main.md`.
+**Status:** 🔄 Rebooting — Ansible-first architecture. See `docs/architecture/ansible-reboot-proposal.md`.
 
-A Raspberry Pi 5 setup framework for self-hosted GitHub Actions runners purpose-built for local performance testing.
+An **Ansible-based automation framework** for setting up Raspberry Pi 5 as a self-hosted GitHub Actions runner for local performance testing. Designed for reproducibility, idempotency, and extensibility to other network hosts.
 
-## Team & Architecture
+## Architecture
 
-This project is guided by the **Squad AI team framework**. Core roles:
+**Phase 1 scope:** Raspberry Pi 5 runner setup only.
 
-- **Treize** — Lead, architecture decisions, reviews
-- **Heero** — Infrastructure & system setup
-- **Wufei** — Performance metrics and benchmarking
-- **Noin** — Validation, testing, and edge cases
+```
+inventories/          # Production/development host inventories
+playbooks/            # Ansible playbooks (pi-runner.yml, site.yml)
+roles/                # Reusable roles (common, docker, github_runner, runner_hooks, caching)
+docs/architecture/    # Architecture proposals and decisions
+```
 
-All decisions, agent histories, and design context live in `.squad/`.
+See [`docs/architecture/ansible-reboot-proposal.md`](docs/architecture/ansible-reboot-proposal.md) for the full proposal.
 
-## Getting Started
+## Team
 
-See `.squad/team.md` for team structure and `.squad/decisions.md` for active architectural decisions.
+This project uses the **Squad AI team framework**:
+
+| Agent | Role |
+|-------|------|
+| **Treize** | Lead — architecture, decisions, reviews |
+| **Heero** | Infrastructure — Ansible roles, Pi setup |
+| **Wufei** | Performance — metrics, benchmarking (Phase 2) |
+| **Noin** | QA — validation, idempotency tests |
+
+Team structure, decisions, and history: [`.squad/`](.squad/)
+
+## Status
+
+- **Prior shell-script implementation:** Archived at `archive/main-2026-04-13`
+- **Current:** Architecture proposal drafted, awaiting approval
+- **Next:** Write spec `0007-ansible-pi-runner-role.md`, then implement
+
+## Quick Links
+
+- [Architecture Proposal](docs/architecture/ansible-reboot-proposal.md)
+- [Decision Record](/.squad/decisions/inbox/treize-ansible-reboot.md)
+- [Team Decisions](/.squad/decisions.md)

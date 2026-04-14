@@ -244,3 +244,18 @@ _Appended during sessions._
 **Pattern learned:** For hardware interface contracts, define the GPIO pin table FIRST and make it authoritative. The HAT PCB designer and the software team both reference the same table. Include physical-layer details (pull-up values, series resistors, current limits) that software engineers wouldn't normally specify — the hardware engineer needs them and won't find them in code.
 
 **Status:** Spec 0006 is in **📝 Draft** status. Requires GitHub issue creation and review before implementation starts. HAT design contract delivered to Fortinbra. Delegated to Heero (implementation) and Noin (validation).
+
+
+### 2026-04-13: Archive & Reset - Pivot to Clean Slate
+
+Complete first implementation cycle archived to archive/main-2026-04-13. Main reset to team scaffolding only.
+
+What shipped: OS setup, runner registration, container isolation, caching infrastructure, cache metrics, MCU flash system, SSH hardening, setup orchestrator, example workflows, specs 0001-0006, full team history.
+
+Archival: Created archive/main-2026-04-13 branch (commit de6a291). Reset main: removed docs/specs/, docs/hardware/, docs/qa/, scripts/, examples/, setup.sh. Kept .squad/, .github/, .copilot/, README.md, repo metadata.
+
+Rationale: Fortinbra pivot request. All prior work auditable. Clean foundation for Phase 2. Decisions, specs, and agent learnings accessible via .squad/ and archive branch.
+
+Key insight: Archival as completion practice. Phase 1 established decision framework (spec-driven, squad structure, patterns). Phase 2 builds with different technical approach if needed.
+
+Next: Await Fortinbra's new direction. Treize breaks it into specs for Phase 2.

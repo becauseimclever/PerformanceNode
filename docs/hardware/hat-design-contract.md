@@ -22,9 +22,10 @@ The software side will not change its GPIO assignments, UART configuration, or d
 | Form factor | Raspberry Pi HAT+ (follows Pi 5 mechanical spec) |
 | Host | Raspberry Pi 5 (BCM2712, RP1 southbridge) |
 | MCU count | 4 |
-| MCU types | 2× RP2040, 1× RP2350B, 1× RP2350A |
+| MCU types | 1× RP2040 (harness, UART), 1× RP2040 (DUT, SWD+RESET), 1× RP2350B (DUT, SWD+RESET), 1× RP2350A (DUT, SWD+RESET) |
 | Connection | 40-pin GPIO header (all signals route through header) |
-| USB | None required — all flashing via SWD, all results via UART |
+| USB | None required — all flashing via SWD, results via single UART from harness MCU |
+| UART topology | **One UART only** — harness RP2040 (RP2040-H) has dedicated UART TX/RX back to Pi. DUT MCUs communicate test results through the harness MCU. |
 
 ---
 
@@ -56,65 +57,71 @@ Each MCU on the HAT MUST expose the following signals to the Pi via the 40-pin G
 - RP2040: Connect to the `RUN` pin (active-low reset).
 - RP2350A/B: Connect to the `RUN` pin (same behavior as RP2040).
 
-### UART — for test result reporting
+### UART — for test result reporting (Harness MCU only)
 
-| Signal | Description | Electrical | Required |
-|---|---|---|---|
-| UART TX → Pi RX | MCU transmits test results to Pi | 3.3V logic | **YES** |
-| UART RX ← Pi TX | Pi transmits to MCU (optional command channel) | 3.3V logic | Recommended |
+| Signal | Description | Electrical | Required | Notes |
+|---|---|---|---|---|
+| UART TX → Pi RX | Harness MCU transmits test results from all 4 MCUs to Pi | 3.3V logic | **YES** | Only one UART total, from harness RP2040 |
+| UART RX ← Pi TX | Pi transmits to harness MCU (optional command channel) | 3.3V logic | Recommended | For future command/control |
 
-**Notes:**
-- Each MCU has a dedicated UART connection (no multiplexing, no bus sharing).
-- The MCU's UART TX connects to the Pi's UART RX pin (crossed).
+**UART Design Notes:**
+- **Only the harness MCU (RP2040-H) has direct UART connection to the Pi.** The 3 DUT MCUs (RP2040-D, RP2350B, RP2350A) do NOT connect to the Pi directly.
+- Test results from DUT MCUs route through the harness MCU via an inter-MCU communication channel (SPI or UART) defined in the MCU test firmware.
+- The harness MCU aggregates results and transmits them as a single unified report over its UART TX line.
 - Flow control (RTS/CTS) is NOT required.
-- The UART result protocol is defined in `docs/hardware/uart-result-protocol.md`.
+- The UART result protocol is defined in `docs/hardware/uart-result-protocol.md` and describes the wire format for the aggregated report.
+- Baud rate: **115200 8N1**
 
 ---
 
-## GPIO Pin Assignments
+## GPIO Pin Assignments — Final
 
 The following table is the definitive pin assignment. The HAT PCB must route these signals accordingly.
 
+### MCU Roles
+
+| MCU Label | Device Type | Role | UART | SWD | RESET |
+|---|---|---|---|---|---|
+| RP2040-H (Harness) | RP2040 | Test harness — coordinates flashing, aggregates results, sends to Pi | ✅ | ✅ | ✅ |
+| RP2040-D (DUT) | RP2040 | Device under test — runs firmware, communicates via inter-MCU link | ❌ | ✅ | ✅ |
+| RP2350B (DUT) | RP2350B | Device under test — runs firmware, communicates via inter-MCU link | ❌ | ✅ | ✅ |
+| RP2350A (DUT) | RP2350A | Device under test — runs firmware, communicates via inter-MCU link | ❌ | ✅ | ✅ |
+
 ### Pin Map (BCM GPIO numbering)
 
-| GPIO | Pin# (header) | Function | MCU | Signal | Direction (Pi perspective) |
-|------|---------------|----------|-----|--------|---------------------------|
-| 0 | 27 | I2C0 SDA | — | HAT EEPROM | bidirectional |
-| 1 | 28 | I2C0 SCL | — | HAT EEPROM | bidirectional |
-| 2 | 3 | Reserved | — | (I2C1 SDA) | — |
-| 3 | 5 | Reserved | — | (I2C1 SCL) | — |
-| 4 | 7 | UART2 TX | RP2040-1 | Pi → MCU | output |
-| 5 | 29 | UART2 RX | RP2040-1 | MCU → Pi | input |
-| 6 | 31 | Status LED | RP2040-0 | LED anode | output |
-| 7 | 26 | Status LED | RP2040-1 | LED anode | output |
-| 8 | 24 | UART3 TX | RP2350B | Pi → MCU | output |
-| 9 | 21 | UART3 RX | RP2350B | MCU → Pi | input |
-| 10 | 19 | Status LED | RP2350B | LED anode | output |
-| 11 | 23 | Status LED | RP2350A | LED anode | output |
-| 12 | 32 | UART4 TX | RP2350A | Pi → MCU | output |
-| 13 | 33 | UART4 RX | RP2350A | MCU → Pi | input |
-| 14 | 8 | UART0 TX | RP2040-0 | Pi → MCU | output |
-| 15 | 10 | UART0 RX | RP2040-0 | MCU → Pi | input |
-| 16 | 36 | SWD | RP2040-0 | SWDIO | bidirectional |
-| 17 | 11 | SWD | RP2040-0 | SWCLK | output |
-| 18 | 12 | Reset | RP2040-0 | RUN/RESET | output (open-drain) |
-| 19 | 35 | SWD | RP2040-1 | SWDIO | bidirectional |
-| 20 | 38 | SWD | RP2040-1 | SWCLK | output |
-| 21 | 40 | Reset | RP2040-1 | RUN/RESET | output (open-drain) |
-| 22 | 15 | SWD | RP2350B | SWDIO | bidirectional |
-| 23 | 16 | SWD | RP2350B | SWCLK | output |
-| 24 | 18 | Reset | RP2350B | RUN/RESET | output (open-drain) |
-| 25 | 22 | SWD | RP2350A | SWDIO | bidirectional |
-| 26 | 37 | SWD | RP2350A | SWCLK | output |
-| 27 | 13 | Reset | RP2350A | RUN/RESET | output (open-drain) |
+| GPIO | Pin# (header) | Function | MCU | Signal | Direction (Pi perspective) | Notes |
+|------|---------------|----------|-----|--------|---------------------------|-------|
+| 0 | 27 | I2C0 SDA | — | HAT EEPROM | bidirectional | **RESERVED** — HAT+ ID EEPROM |
+| 1 | 28 | I2C0 SCL | — | HAT EEPROM | bidirectional | **RESERVED** — HAT+ ID EEPROM |
+| 2 | 3 | Reserved | — | (I2C1 SDA) | — | Future expansion |
+| 3 | 5 | Reserved | — | (I2C1 SCL) | — | Future expansion |
+| 4 | 7 | UART TX | RP2040-H | Pi → MCU | output | Harness UART (optional command) |
+| 5 | 29 | UART RX | RP2040-H | MCU → Pi | input | Harness UART (aggregated results) |
+| 6 | 31 | Status LED | RP2040-H | LED anode | output | Optional — harness status |
+| 7 | 26 | Status LED | RP2040-D | LED anode | output | Optional — DUT status |
+| 8 | 24 | Status LED | RP2350B | LED anode | output | Optional — DUT status |
+| 9 | 21 | Status LED | RP2350A | LED anode | output | Optional — DUT status |
+| 10–15 | — | (unused) | — | — | — | Available for future use |
+| 16 | 36 | SWD | RP2040-H | SWDIO | bidirectional | Harness SWD data |
+| 17 | 11 | SWD | RP2040-H | SWCLK | output | Harness SWD clock |
+| 18 | 12 | Reset | RP2040-H | RUN/RESET | output (open-drain) | Active-low, 10kΩ pull-up on HAT |
+| 19 | 35 | SWD | RP2040-D | SWDIO | bidirectional | DUT SWD data |
+| 20 | 38 | SWD | RP2040-D | SWCLK | output | DUT SWD clock |
+| 21 | 40 | Reset | RP2040-D | RUN/RESET | output (open-drain) | Active-low, 10kΩ pull-up on HAT |
+| 22 | 15 | SWD | RP2350B | SWDIO | bidirectional | DUT SWD data |
+| 23 | 16 | SWD | RP2350B | SWCLK | output | DUT SWD clock |
+| 24 | 18 | Reset | RP2350B | RUN/RESET | output (open-drain) | Active-low, 10kΩ pull-up on HAT |
+| 25 | 22 | SWD | RP2350A | SWDIO | bidirectional | DUT SWD data |
+| 26 | 37 | SWD | RP2350A | SWCLK | output | DUT SWD clock |
+| 27 | 13 | Reset | RP2350A | RUN/RESET | output (open-drain) | Active-low, 10kΩ pull-up on HAT |
 
 ### Power Pins Used
 
-| Pin# (header) | Signal | Usage |
-|---|---|---|
-| 1 | 3.3V | MCU power supply (if MCUs powered from Pi 3.3V rail) |
-| 2, 4 | 5V | HAT power input (from Pi 5V rail, up to 1.6A from Pi) |
-| 6, 9, 14, 20, 25, 30, 34, 39 | GND | Ground reference — use multiple ground pins for signal integrity |
+| Pin# (header) | Signal | Usage | Voltage |
+|---|---|---|---|
+| 1 | 3.3V | MCU power supply (all 4 MCUs) | 3.3V |
+| 2, 4 | 5V | HAT optional secondary supply | 5V |
+| 6, 9, 14, 20, 25, 30, 34, 39 | GND | Ground reference — use multiple ground pins for signal integrity | 0V (reference) |
 
 ---
 
@@ -132,16 +139,15 @@ The following table is the definitive pin assignment. The HAT PCB must route the
 
 | Component | Estimated Current (3.3V) | Notes |
 |---|---|---|
-| RP2040 × 2 | 2 × 25 mA = 50 mA typical | Dual-core at 125 MHz, no WiFi |
-| RP2350B × 1 | 35 mA typical | Quad-core capable, higher than RP2040 |
-| RP2350A × 1 | 30 mA typical | Dual-core ARM variant |
+| RP2040 (Harness) × 1 | 25 mA typical | Dual-core at 125 MHz, no WiFi, coordinates flashing & results |
+| RP2040 (DUT) × 1 | 25 mA typical | Dual-core at 125 MHz, runs test firmware |
+| RP2350B (DUT) × 1 | 35 mA typical | Quad-core capable, higher than RP2040, runs test firmware |
+| RP2350A (DUT) × 1 | 30 mA typical | Dual-core ARM variant, runs test firmware |
 | Status LEDs × 4 | 4 × 5 mA = 20 mA | With current-limiting resistors |
 | Miscellaneous (EEPROM, passives) | 5 mA | |
 | **Total** | **~140 mA** | Well within Pi 5's 3.3V rail capacity (~800 mA) |
 
 **Recommendation:** Power all MCUs from the Pi's 3.3V rail via the GPIO header. The total current draw (~140 mA) is well within the Pi 5's 3.3V regulator capacity. No separate power supply or 5V-to-3.3V regulation needed on the HAT.
-
-**If MCU test firmware exercises high-current peripherals** (e.g., driving external loads), add a dedicated 3.3V LDO on the HAT powered from the 5V rail (header pins 2/4). Keep digital and analog grounds separate on the PCB.
 
 ---
 
@@ -195,14 +201,14 @@ Per the [Raspberry Pi HAT+ specification](https://github.com/raspberrypi/hats), 
 
 ### Status LEDs
 
-4 optional status LEDs (one per MCU) are driven from GPIO 6, 7, 10, 11:
+4 optional status LEDs (one per MCU) are driven from GPIO 6–9:
 
-| GPIO | LED | Current-limit Resistor |
-|---|---|---|
-| 6 | RP2040-0 status | 330Ω (for ~5 mA at 3.3V with typical LED Vf=1.65V) |
-| 7 | RP2040-1 status | 330Ω |
-| 10 | RP2350B status | 330Ω |
-| 11 | RP2350A status | 330Ω |
+| GPIO | LED | MCU | Current-limit Resistor |
+|---|---|---|---|
+| 6 | Harness status | RP2040-H | 330Ω (for ~5 mA at 3.3V with typical LED Vf=1.65V) |
+| 7 | DUT status | RP2040-D | 330Ω |
+| 8 | DUT status | RP2350B | 330Ω |
+| 9 | DUT status | RP2350A | 330Ω |
 
 LEDs are active-high: Pi GPIO HIGH = LED on, LOW = LED off.
 
@@ -235,4 +241,5 @@ The HAT SHOULD include test points for debugging:
 
 | Version | Date | Author | Changes |
 |---|---|---|---|
+| 2.0 | 2026-04-11 | Treize | **Finalized MCU topology:** Single UART from harness RP2040 only. DUT MCUs communicate results through harness. Simplified GPIO allocation (12 GPIO for SWD/RESET + 2 for UART + 4 for LEDs = 18 pins total; 10 pins available). Clarified harness vs. DUT roles. |
 | 1.0 | 2026-04-11 | Treize | Initial HAT design contract |

@@ -17,13 +17,13 @@
 #
 # Environment variables:
 #   REGISTRY_PORT       Local registry port   (default: 5001)
-#   REGISTRY_DATA_DIR   Local registry data   (default: /opt/cache/docker-registry)
+#   REGISTRY_DATA_DIR   Local registry data   (default: /opt/runner-cache/docker-registry)
 
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────
 REGISTRY_PORT="${REGISTRY_PORT:-5001}"
-REGISTRY_DATA_DIR="${REGISTRY_DATA_DIR:-/opt/cache/docker-registry}"
+REGISTRY_DATA_DIR="${REGISTRY_DATA_DIR:-/opt/runner-cache/docker-registry}"
 WITH_LOCAL_REGISTRY=false
 
 # Images to pre-pull.  All must have linux/arm64 variants.

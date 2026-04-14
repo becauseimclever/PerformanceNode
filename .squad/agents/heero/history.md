@@ -55,3 +55,12 @@ Heero initialized as Infrastructure Dev on 2026-04-10.
 - `scripts/setup/setup-docker.sh` — Official Docker apt repo (Bookworm ARM64), `daemon.json` (overlay2 + json-file log rotation 10m/3), systemd enable, `actions-runner` docker group assignment, optional hello-world verify (skipped with `--non-interactive`).
 - `scripts/setup/setup-runner.sh` — GitHub API latest linux-arm64 release download, extract to `/opt/actions-runner/`, `config.sh --unattended --replace` as `actions-runner` user, `svc.sh install` + systemd enable. Requires `GITHUB_OWNER`, `GITHUB_REPO`, `RUNNER_TOKEN`; prints clear guidance if missing. Idempotent: skips if service already active.
 - `setup.sh` phase stubs for system/docker/runner already existed — removed redundant file-exists guards (handled by `run_script` helper) and updated comment strings from "placeholder" to actual script paths.
+
+### 2026-04-13: Validation-state cleanup and service/drop-in reconciliation
+
+- Added `scripts/lib/runner-service.sh` so cache/setup/verify scripts can consistently detect the real runner unit, stage drop-ins before registration, and sync them after `svc.sh install`.
+- `scripts/setup/setup-runner.sh` now installs Node.js + `@actions/runner-container-hooks`, refreshes prerequisites even when the runner is already registered, syncs staged drop-ins to the real unit, and creates an `actions-runner` compatibility alias for operator commands.
+- Cache scripts now write dynamic runner drop-ins through the shared helper and use `chmod 1777` for writable cache dirs (`nuget`, `ccache`) to match the container UID-mismatch design.
+- `setup.sh` now points its verify phase at `scripts/verify/verify-setup.sh`; `setup-ssh.sh` targets the intended SSH user home instead of blindly using root's `$HOME`, and restarts `ssh` with `sshd` fallback.
+- Docs/examples/spec text were reconciled with current paths (`/opt/runner-cache`), current runner labels (`self-hosted,linux,arm64,performancenode`), and current MCU action inputs.
+- Validation run used `git diff --check` on touched files, `bash -n` for shell scripts, `python -m py_compile` for MCU Python scripts, and `npx js-yaml` for the modified workflow/action YAML.

@@ -18,10 +18,9 @@
 set -euo pipefail
 
 # ── Configuration ─────────────────────────────────────────────────────────
-SSH_DIR="${HOME}/.ssh"
-AUTH_KEYS="${SSH_DIR}/authorized_keys"
 SSHD_CONFIG="/etc/ssh/sshd_config"
 NON_INTERACTIVE=false
+SSH_TARGET_USER="${SSH_TARGET_USER:-${SUDO_USER:-root}}"
 
 # ── Argument parsing ───────────────────────────────────────────────────────
 for arg in "$@"; do
@@ -39,7 +38,12 @@ fi
 
 echo ""
 echo "==> SSH Hardening Setup"
-echo "    Target user home : ${HOME}"
+TARGET_HOME=$(getent passwd "$SSH_TARGET_USER" | cut -d: -f6 || true)
+[ -n "$TARGET_HOME" ] || { echo "ERROR: Could not resolve home directory for ${SSH_TARGET_USER}." >&2; exit 1; }
+SSH_DIR="${TARGET_HOME}/.ssh"
+AUTH_KEYS="${SSH_DIR}/authorized_keys"
+echo "    Target user      : ${SSH_TARGET_USER}"
+echo "    Target user home : ${TARGET_HOME}"
 echo "    authorized_keys  : ${AUTH_KEYS}"
 echo "    sshd_config      : ${SSHD_CONFIG}"
 echo ""
@@ -76,6 +80,7 @@ else
   mkdir -p "$SSH_DIR"
   chmod 700 "$SSH_DIR"
   echo "$PUBLIC_KEY" >> "$AUTH_KEYS"
+  chown -R "${SSH_TARGET_USER}:${SSH_TARGET_USER}" "$SSH_DIR"
   echo "    Key written to ${AUTH_KEYS}"
 fi
 
@@ -83,6 +88,7 @@ fi
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
 chmod 600 "$AUTH_KEYS"
+chown -R "${SSH_TARGET_USER}:${SSH_TARGET_USER}" "$SSH_DIR"
 echo "    Permissions: ${SSH_DIR} → 700, ${AUTH_KEYS} → 600"
 
 # Verify the key file is non-empty.
@@ -145,8 +151,14 @@ set_sshd_option "PermitRootLogin"        "no"
 
 echo ""
 echo "--> Restarting sshd..."
-systemctl restart sshd
-echo "    sshd restarted. ✓"
+if systemctl restart ssh 2>/dev/null; then
+  echo "    ssh restarted. ✓"
+elif systemctl restart sshd 2>/dev/null; then
+  echo "    sshd restarted. ✓"
+else
+  echo "ERROR: Could not restart ssh or sshd service." >&2
+  exit 1
+fi
 
 # ── Summary ────────────────────────────────────────────────────────────────
 echo ""

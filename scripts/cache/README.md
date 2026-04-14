@@ -6,9 +6,9 @@ Scripts in this directory set up persistent host-side caches on the Pi 5 and bin
 
 ```
 Pi 5 host
-├── /opt/cache/nuget        ← NuGet packages (shared across .NET jobs)
-├── /opt/cache/pico-sdk     ← Pico SDK source tree (read-only in containers)
-├── /opt/cache/ccache       ← ccache object cache (C/C++ compilation)
+├── /opt/runner-cache/nuget        ← NuGet packages (shared across .NET jobs)
+├── /opt/runner-cache/pico-sdk     ← Pico SDK source tree (read-only in containers)
+├── /opt/runner-cache/ccache       ← ccache object cache (C/C++ compilation)
 └── /opt/runner-hooks/
     ├── cache-hook-wrapper.js  ← injects mounts into every job container
     └── node_modules/@actions/runner-container-hooks/...  ← real Docker hook
@@ -16,11 +16,11 @@ Pi 5 host
 
 Every job container gets three bind mounts automatically (no `volumes:` in workflow YAML required):
 
-| Host path             | Container path          | Mode |
-|-----------------------|-------------------------|------|
-| `/opt/cache/nuget`    | `/root/.nuget/packages` | rw   |
-| `/opt/cache/pico-sdk` | `/opt/pico-sdk`         | ro   |
-| `/opt/cache/ccache`   | `/root/.ccache`         | rw   |
+| Host path                    | Container path          | Mode |
+|------------------------------|-------------------------|------|
+| `/opt/runner-cache/nuget`    | `/root/.nuget/packages` | rw   |
+| `/opt/runner-cache/pico-sdk` | `/opt/pico-sdk`         | ro   |
+| `/opt/runner-cache/ccache`   | `/root/.ccache`         | rw   |
 
 ---
 
@@ -28,7 +28,7 @@ Every job container gets three bind mounts automatically (no `volumes:` in workf
 
 ### `setup-nuget-cache.sh`
 
-Creates `/opt/cache/nuget`, sets ownership to `actions-runner`, and writes a systemd drop-in that exposes `NUGET_PACKAGES=/opt/cache/nuget` to the runner process.
+Creates `/opt/runner-cache/nuget`, sets sticky-bit permissions for container UID compatibility, and writes a runner systemd drop-in that exposes `NUGET_PACKAGES=/opt/runner-cache/nuget` to the runner process.
 
 ```bash
 sudo ./setup-nuget-cache.sh
@@ -38,14 +38,14 @@ sudo ./setup-nuget-cache.sh --with-local-feed
 
 **To update the NuGet cache:**  The cache is a plain directory; packages accumulate automatically.  To clear stale packages:
 ```bash
-sudo rm -rf /opt/cache/nuget/*
+sudo rm -rf /opt/runner-cache/nuget/*
 ```
 
 ---
 
 ### `setup-pico-sdk-cache.sh`
 
-Installs `gcc-arm-none-eabi`, `cmake`, `ninja-build`, and `ccache` via apt (pinned to Debian Bookworm versions), clones the Pico SDK at `PICO_SDK_VERSION` to `/opt/cache/pico-sdk`, and creates `/opt/cache/ccache`.
+Installs `gcc-arm-none-eabi`, `cmake`, `ninja-build`, and `ccache` via apt (pinned to Debian Bookworm versions), clones the Pico SDK at `PICO_SDK_VERSION` to `/opt/runner-cache/pico-sdk`, and creates `/opt/runner-cache/ccache` with sticky-bit permissions for container UID compatibility.
 
 ```bash
 sudo ./setup-pico-sdk-cache.sh
@@ -56,7 +56,7 @@ sudo PICO_SDK_VERSION=2.2.0 ./setup-pico-sdk-cache.sh
 **To update the Pico SDK version:**
 
 1. Set `PICO_SDK_VERSION` to the new tag (check https://github.com/raspberrypi/pico-sdk/releases).
-2. Delete the existing directory: `sudo rm -rf /opt/cache/pico-sdk`
+2. Delete the existing directory: `sudo rm -rf /opt/runner-cache/pico-sdk`
 3. Re-run: `sudo PICO_SDK_VERSION=<new-tag> ./setup-pico-sdk-cache.sh`
 4. Run `sudo systemctl restart actions-runner` to apply the new path.
 
@@ -94,7 +94,7 @@ sudo ./setup-docker-image-cache.sh --with-local-registry
 
 ### `inject-cache-mounts.sh`
 
-Installs `/opt/runner-hooks/cache-hook-wrapper.js` and writes a systemd drop-in that routes `ACTIONS_RUNNER_CONTAINER_HOOKS` through the wrapper.
+Installs `/opt/runner-hooks/cache-hook-wrapper.js` and writes a systemd drop-in that routes `ACTIONS_RUNNER_CONTAINER_HOOKS` through the wrapper. If the runner has not been registered yet, the drop-in is staged and later synced to the real runner service on first runner setup.
 
 The wrapper intercepts `prepare_job` and injects the three cache bind mounts plus environment variables (`NUGET_PACKAGES`, `PICO_SDK_PATH`, `CCACHE_DIR`) into the container spec before forwarding to the real Docker hook.
 

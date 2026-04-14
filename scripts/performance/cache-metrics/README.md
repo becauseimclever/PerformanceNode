@@ -19,7 +19,7 @@ used by the PerformanceNode GitHub Actions self-hosted runner.
 ### What it measures
 - **Cold build** — `dotnet restore` + `dotnet build` with an empty local NuGet package store.
   All packages must be downloaded from NuGet.org.
-- **Warm build** — same build with packages already in `/opt/cache/nuget` (the bind-mounted cache).
+- **Warm build** — same build with packages already in `/opt/runner-cache/nuget` (the bind-mounted cache).
   Packages are resolved from disk, no network required.
 - **Network delta** — bytes sent/received (from `/proc/net/dev`) for each run.
 - **Packages from cache** — number of `.nupkg` files in the warm store.
@@ -48,8 +48,8 @@ used by the PerformanceNode GitHub Actions self-hosted runner.
 ### Environment variables
 | Variable | Default | Description |
 |---|---|---|
-| `NUGET_CACHE_DIR` | `/opt/cache/nuget` | Host-mounted NuGet package cache |
-| `WORK_DIR` | `/tmp/nuget-bench` | Scratch directory |
+| `NUGET_CACHE_DIR` | `/opt/runner-cache/nuget` | Host-mounted NuGet package cache |
+| `WORK_DIR` | `$PWD/.performancenode/nuget-bench` | Scratch directory |
 | `TEST_PROJECT` | *(auto-generated)* | Path to a `.csproj` to build |
 
 ---
@@ -86,8 +86,8 @@ used by the PerformanceNode GitHub Actions self-hosted runner.
 | Variable | Default | Description |
 |---|---|---|
 | `PICO_SDK_PATH` | `/opt/pico-sdk` | Path to the Pico SDK |
-| `CCACHE_DIR` | `/opt/cache/ccache` | Host-mounted ccache directory |
-| `WORK_DIR` | `/tmp/pico-bench` | Scratch directory |
+| `CCACHE_DIR` | `/opt/runner-cache/ccache` | Host-mounted ccache directory |
+| `WORK_DIR` | `$PWD/.performancenode/pico-bench` | Scratch directory |
 | `TOOLCHAIN_PREFIX` | `arm-none-eabi` | Cross-compiler prefix |
 
 ---
@@ -136,7 +136,7 @@ used by the PerformanceNode GitHub Actions self-hosted runner.
 ## Running all benchmarks
 
 ```bash
-# Run everything, output to default /tmp/cache-benchmarks/
+# Run everything, output to default $PWD/.performancenode/cache-benchmarks/
 ./run-all-cache-benchmarks.sh
 
 # Custom output directory
@@ -212,3 +212,55 @@ Add a step to your GitHub Actions workflow after a build:
 | ccache `ccache_hit_rate_pct` | ≥ 70 % | Majority of compile units served from cache |
 | Pico SDK `speedup_factor` | ≥ 3× | ccache should significantly outpace cold |
 | Docker `warm_pull_ms` | < 5 000 ms | Cached pull is near-instant |
+
+---
+
+## Future: MCU Performance Metrics
+
+MCU test firmware running on the four HAT-connected MCUs (2× RP2040, 1× RP2350A, 1× RP2350B)
+reports performance measurements over UART using `METRIC` lines defined in
+[`docs/hardware/uart-result-protocol.md`](../../../../docs/hardware/uart-result-protocol.md).
+
+In a future iteration, these MCU metrics will be collected alongside the host cache metrics
+above and merged into the `summary.json` output. The `run-all-cache-benchmarks.sh` orchestrator
+will gain an `--include-mcu` flag that invokes `parse-results.py` and appends an `mcu_metrics`
+block to `summary.json`.
+
+### Planned `summary.json` extension
+
+The current format:
+```json
+{
+  "generated_at": "...",
+  "benchmarks": {
+    "nuget": { ... },
+    "pico_sdk": { ... },
+    "docker": { ... }
+  }
+}
+```
+
+Will be extended to:
+```json
+{
+  "generated_at": "...",
+  "benchmarks": {
+    "nuget": { ... },
+    "pico_sdk": { ... },
+    "docker": { ... }
+  },
+  "mcu_metrics": {
+    "rp2040-0": [
+      { "name": "gpio_toggle_rate", "value": 1183.2, "unit": "kHz" },
+      { "name": "spi_throughput",   "value": 8.0,    "unit": "MHz" }
+    ],
+    "rp2040-1": [ ... ],
+    "rp2350a":  [ ... ],
+    "rp2350b":  [ ... ]
+  }
+}
+```
+
+The MCU metrics section is populated only when `--include-mcu` is passed and a UART capture
+(or live UART device) is available. If MCU data is absent, the key is omitted entirely so that
+existing consumers of `summary.json` continue to work without changes.

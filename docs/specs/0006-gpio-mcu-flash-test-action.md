@@ -112,7 +112,7 @@ The Pi 5's RP1 southbridge provides 6 PL011 UARTs, but only ONE is used in this 
 - Instead, they communicate results to the harness MCU (RP2040-H) via an inter-MCU link (implementation-defined by test firmware).
 - The harness MCU collects all results, formats them per Wufei's UART Result Protocol, and transmits the aggregate over its UART TX line.
 
-**Baud rate: 115200 8N1** (per Wufei's UART Result Protocol spec in `docs/hardware/uart-result-protocol.md`). The action's `baud-rate` input allows override for specific test scenarios.
+**Baud rate: 115200 8N1** (per Wufei's UART Result Protocol spec in `docs/hardware/uart-result-protocol.md`). The current action keeps this fixed and only exposes the UART timeout as a runtime input.
 
 **Device tree configuration** (added to `/boot/firmware/config.txt` by setup script):
 ```
@@ -153,28 +153,14 @@ The complete GPIO interface contract between the Pi software and the HAT hardwar
 
 **Inputs:**
 
-| `mcu-targets` | no | `all` | Comma-separated MCU list: `rp2040-h,rp2040-d,rp2350b,rp2350a` or `all` (harness coordinates all flashing) |
-| `firmware-dir` | yes | — | Path to directory containing firmware files. Expected naming: `{mcu-id}.elf` (e.g., `rp2040-h.elf`, `rp2040-d.elf`) |
-| `uart-timeout` | no | `30` | Seconds to wait for aggregated UART results from harness MCU (maps to `UART_INTER_LINE_TIMEOUT`) |
-| `baud-rate` | no | `115200` | UART baud rate for harness UART connection (single UART) |
-| `flash-verify` | no | `true` | Verify firmware after flashing via SWD readback |
-| `parallel-listen` | no | `false` | Ignored (single UART only) |
-| `rp2040-h-swdio` | no | `16` | GPIO pin for RP2040-H (Harness) SWDIO |
-| `rp2040-h-swclk` | no | `17` | GPIO pin for RP2040-H (Harness) SWCLK |
-| `rp2040-h-reset` | no | `18` | GPIO pin for RP2040-H (Harness) RUN/RESET |
-| `rp2040-h-uart` | no | `/dev/ttyAMA2` | UART device for RP2040-H (Harness) — aggregated results from all MCUs |
-| `rp2040-d-swdio` | no | `19` | GPIO pin for RP2040-D (DUT) SWDIO |
-| `rp2040-d-swclk` | no | `20` | GPIO pin for RP2040-D (DUT) SWCLK |
-| `rp2040-d-reset` | no | `21` | GPIO pin for RP2040-D (DUT) RUN/RESET |
-| `rp2040-d-uart` | no | (not used) | RP2040-D does not have direct UART connection |
-| `rp2350b-swdio` | no | `22` | GPIO pin for RP2350B (DUT) SWDIO |
-| `rp2350b-swclk` | no | `23` | GPIO pin for RP2350B (DUT) SWCLK |
-| `rp2350b-reset` | no | `24` | GPIO pin for RP2350B (DUT) RUN/RESET |
-| `rp2350b-uart` | no | (not used) | RP2350B does not have direct UART connection |
-| `rp2350a-swdio` | no | `25` | GPIO pin for RP2350A (DUT) SWDIO |
-| `rp2350a-swclk` | no | `26` | GPIO pin for RP2350A (DUT) SWCLK |
-| `rp2350a-reset` | no | `27` | GPIO pin for RP2350A (DUT) RUN/RESET |
-| `rp2350a-uart` | no | (not used) | RP2350A does not have direct UART connection |
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `firmware-rp2040-h` | no | `''` | Path to RP2040-H (Harness) firmware file (`.elf` or `.uf2`) |
+| `firmware-rp2040-d` | no | `''` | Path to RP2040-D (DUT) firmware file (`.elf` or `.uf2`) |
+| `firmware-rp2350b-d` | no | `''` | Path to RP2350B-D (DUT) firmware file (`.elf` or `.uf2`) |
+| `firmware-rp2350a-d` | no | `''` | Path to RP2350A-D (DUT) firmware file (`.elf` or `.uf2`) |
+| `uart-timeout` | no | `120` | Seconds to wait for aggregated UART results from the harness MCU |
+| `openocd-path` | no | `openocd` | Path to the OpenOCD binary inside the job environment |
 
 **Outputs:**
 
@@ -183,14 +169,13 @@ The complete GPIO interface contract between the Pi software and the HAT hardwar
 | `results-json` | Full JSON string of all MCU test results (structured per Wufei's output format) |
 | `passed` | Total number of MCUs where all tests passed |
 | `failed` | Total number of MCUs with at least one failure or timeout |
-| `total-tests` | Total individual test cases across all MCUs |
 | `summary` | Human-readable one-liner, e.g., `3/4 MCUs passed (32 tests, 2 failures, 1 timeout)` |
 
 **Workflow example:**
 ```yaml
 jobs:
   hardware-test:
-    runs-on: [self-hosted, performancenode]
+    runs-on: [self-hosted, linux, arm64, performancenode]
     steps:
       - uses: actions/checkout@v4
 
@@ -201,10 +186,12 @@ jobs:
 
       - name: Flash and test MCUs
         id: mcu-test
-        uses: ./.github/actions/mcu-flash-test
+        uses: ./.github/actions/mcu-test
         with:
-          mcu-targets: all
-          firmware-dir: firmware/build/
+          firmware-rp2040-h: firmware/build/rp2040-h.elf
+          firmware-rp2040-d: firmware/build/rp2040-d.elf
+          firmware-rp2350b-d: firmware/build/rp2350b-d.elf
+          firmware-rp2350a-d: firmware/build/rp2350a-d.elf
           uart-timeout: 60
 
       - name: Check results
@@ -216,12 +203,12 @@ jobs:
 
 | Component | Owner | Description |
 |---|---|---|
-| `scripts/setup/setup-gpio-uart.sh` | Heero | Idempotent host setup: enable DT overlay for UART2, configure GPIO permissions, install OpenOCD |
-| `scripts/gpio/flash-mcu.sh` | Heero | Flash one MCU via SWD (called by the action per target) |
-| `scripts/gpio/listen-uart.py` | Heero | Single UART listener implementing Wufei's protocol parser (reads aggregated results from harness MCU) |
-| `scripts/gpio/generate-openocd-cfg.sh` | Heero | Generate OpenOCD config files from pin assignments (one per MCU) |
+| `scripts/mcu/setup-mcu-deps.sh` | Heero | Idempotent host setup: install OpenOCD, serial tooling, GPIO/UART permissions, and runner group membership |
+| `scripts/mcu/flash-mcu.py` | Heero | Flash one MCU via SWD/OpenOCD (called by the action per target) |
+| `scripts/mcu/read-uart.py` | Heero | Single UART listener implementing Wufei's protocol parser (reads aggregated results from harness MCU) |
+| `scripts/mcu/parse-results.py` | Heero | Convert UART output into action outputs and GitHub step summary content |
 | Hook wrapper extension | Heero | Extend `cache-hook-wrapper.js` to inject device passthrough (`--device=/dev/gpiochip4 --device=/dev/ttyAMA2`) |
-| `.github/actions/mcu-flash-test/action.yml` | Heero | Composite action orchestrating flash (4 MCUs) + listen (1 UART) + report |
+| `.github/actions/mcu-test/action.yml` | Heero | Composite action orchestrating flash (4 MCUs) + listen (1 UART) + report |
 | UART result protocol | Wufei | Already defined: `docs/hardware/uart-result-protocol.md` (describes aggregated format) |
 | GitHub summary format | Wufei | Already defined: `docs/hardware/github-output-format.md` |
 
@@ -238,7 +225,7 @@ jobs:
 - [ ] The `results-json` output contains valid JSON parseable by downstream steps
 - [ ] The `summary` output contains a human-readable one-liner with pass/fail counts
 - [ ] GPIO and UART devices (`/dev/gpiochip4`, `/dev/ttyAMA2`) are accessible inside the job container
-- [ ] The action works with `mcu-targets: rp2040-h` (single MCU) and `mcu-targets: all` (all MCUs)
+- [ ] The action works when only one firmware input is provided and when all four firmware inputs are provided together
 - [ ] Pin assignments are configurable via action inputs (not hardcoded)
 - [ ] The setup script (`setup-gpio-uart.sh`) is idempotent — running it twice produces no errors
 - [ ] Device tree overlay for UART2 is enabled in `/boot/firmware/config.txt` after setup

@@ -4,8 +4,8 @@
 set -euo pipefail
 
 PICO_SDK_PATH="${PICO_SDK_PATH:-/opt/pico-sdk}"
-CCACHE_DIR="${CCACHE_DIR:-/opt/cache/ccache}"
-WORK_DIR="${WORK_DIR:-/tmp/pico-bench}"
+CCACHE_DIR="${CCACHE_DIR:-/opt/runner-cache/ccache}"
+WORK_DIR="${WORK_DIR:-${PWD}/.performancenode/pico-bench}"
 TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX:-arm-none-eabi}"
 
 # ---------- helpers ----------

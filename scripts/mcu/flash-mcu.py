@@ -25,9 +25,9 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
@@ -138,7 +138,7 @@ exit 0
 """
 
 
-def flash(mcu: str, firmware: Path) -> None:
+def flash(mcu: str, firmware: Path, openocd_bin: str) -> None:
     """Flash firmware to MCU via OpenOCD SWD. Raises RuntimeError on failure."""
 
     if mcu not in MCU_CONFIG:
@@ -159,35 +159,33 @@ def flash(mcu: str, firmware: Path) -> None:
     print(f"  Firmware: {firmware}")
     print(f"  SWD pins: SWDIO={swdio}, SWDCLK={swdclk}, RESET={reset}")
 
-    # Create temporary files for OpenOCD config
-    with tempfile.TemporaryDirectory(prefix="openocd-") as tmpdir:
-        tmpdir_path = Path(tmpdir)
+    scratch_dir = Path.cwd() / ".performancenode" / "openocd" / mcu
+    if scratch_dir.exists():
+        shutil.rmtree(scratch_dir, ignore_errors=True)
+    scratch_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate interface config
-        interface_cfg = tmpdir_path / "interface.cfg"
+    try:
+        interface_cfg = scratch_dir / "interface.cfg"
         interface_cfg.write_text(
             _generate_openocd_interface_cfg(swdio, swdclk, reset),
             encoding="utf-8",
         )
 
-        # Generate program config
-        program_cfg = tmpdir_path / "program.cfg"
+        program_cfg = scratch_dir / "program.cfg"
         program_cfg.write_text(
             _generate_openocd_program_cfg(target_cfg, firmware, interface_cfg),
             encoding="utf-8",
         )
 
-        # Assert RESET before flashing
         print(f"  Asserting RESET (GPIO {reset})...")
         try:
             _assert_reset(reset)
         except Exception as exc:
             raise RuntimeError(f"Failed to assert RESET: {exc}") from exc
 
-        # Run OpenOCD
-        print(f"  Running OpenOCD...")
+        print("  Running OpenOCD...")
         cmd = [
-            "openocd",
+            openocd_bin,
             "-f",
             str(program_cfg),
         ]
@@ -205,24 +203,24 @@ def flash(mcu: str, firmware: Path) -> None:
             ) from None
         except FileNotFoundError:
             raise RuntimeError(
-                "openocd not found. Install with: sudo apt-get install openocd"
+                f"{openocd_bin} not found. Install OpenOCD or pass --openocd <path>."
             ) from None
 
-        # Check OpenOCD exit code
         if result.returncode != 0:
             error_msg = result.stderr if result.stderr else result.stdout
             raise RuntimeError(
                 f"OpenOCD failed (exit code {result.returncode}):\n{error_msg}"
             )
 
-        # Release RESET after flashing
         print(f"  Releasing RESET (GPIO {reset})...")
         try:
             _release_reset(reset)
         except Exception as exc:
             raise RuntimeError(f"Failed to release RESET: {exc}") from exc
 
-        print(f"  ✓ Flash successful")
+        print("  ✓ Flash successful")
+    finally:
+        shutil.rmtree(scratch_dir, ignore_errors=True)
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
@@ -244,6 +242,11 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         help="Path to firmware file (.elf or .uf2)",
     )
+    parser.add_argument(
+        "--openocd",
+        default="openocd",
+        help="Path to the OpenOCD binary (default: openocd from PATH)",
+    )
     return parser.parse_args()
 
 
@@ -251,7 +254,7 @@ def main() -> None:
     args = _parse_args()
 
     try:
-        flash(mcu=args.mcu, firmware=args.firmware)
+        flash(mcu=args.mcu, firmware=args.firmware, openocd_bin=args.openocd)
         print(f"\n✓ FLASH OK: {args.mcu}")
         sys.exit(0)
     except FileNotFoundError as exc:

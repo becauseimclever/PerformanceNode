@@ -6,7 +6,7 @@
 #   - python3-serial     (pyserial — UART communication)
 #   - python3-udev       (pyudev — USB device detection)
 #   - util-linux         (mount/umount)
-#   - Adds actions-runner user to gpio, dialout, plugdev groups
+#   - Adds actions-runner user to gpio and dialout groups
 #
 # Idempotent: safe to run multiple times.
 # Must be run as root (sudo ./setup-mcu-deps.sh).
@@ -15,6 +15,9 @@
 #   sudo ./scripts/mcu/setup-mcu-deps.sh [--non-interactive]
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/runner-service.sh"
 
 RUNNER_USER="${RUNNER_USER:-actions-runner}"
 NON_INTERACTIVE=false
@@ -95,7 +98,7 @@ else
 
   echo ""
   warning "Group changes take effect on next login / service restart."
-  warning "Restart the actions-runner service: systemctl restart actions-runner"
+  warning "Restart the runner service: systemctl restart $(runner_detect_service_name)"
 fi
 
 # ── udev rules — ensure /dev/gpiomem and serial devices are accessible ───────

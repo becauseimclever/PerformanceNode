@@ -13,6 +13,16 @@ Noin initialized as Tester/QA on 2026-04-10.
 
 _Appended during sessions._
 
+### 2026-04-13: QA refresh against current tree
+
+**Scope:** Refreshed QA artifacts against the live working tree after earlier rate-limit interruption.
+
+**Key outcomes:**
+- Older `/opt/cache` findings were stale; current cache scripts now target `/opt/runner-cache`.
+- The real blocking issue is now **runner service-name mismatch**: cache scripts write drop-ins under `actions-runner.service.d`, while `setup-runner.sh` installs a dynamic `actions.runner.*.service`.
+- Container-isolation validation is still blocked because no committed setup script provisions Node.js + `@actions/runner-container-hooks` at the path expected by `inject-cache-mounts.sh`.
+- Added LF enforcement via `.gitattributes` after CRLF endings broke shell parsing during QA validation.
+
 ### 2026-04-10: QA & Validation Charter
 
 **Role:** Noin is the acceptance gatekeeper — no spec closes until acceptance criteria are verified and signed off.

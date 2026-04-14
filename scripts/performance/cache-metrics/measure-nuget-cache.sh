@@ -3,8 +3,8 @@
 # Outputs JSON: cold/warm build times, speedup, packages from cache, network bytes.
 set -euo pipefail
 
-NUGET_CACHE_DIR="${NUGET_CACHE_DIR:-/opt/cache/nuget}"
-WORK_DIR="${WORK_DIR:-/tmp/nuget-bench}"
+NUGET_CACHE_DIR="${NUGET_CACHE_DIR:-/opt/runner-cache/nuget}"
+WORK_DIR="${WORK_DIR:-${PWD}/.performancenode/nuget-bench}"
 TEST_PROJECT="${TEST_PROJECT:-}"  # Path to a .csproj; auto-generated if empty
 
 # ---------- helpers ----------

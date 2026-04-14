@@ -46,3 +46,67 @@ Researched and documented a complete host-volume caching strategy for the two pr
 **Deliverables produced:**
 - `docs/caching-strategy.md` — full strategy with workflow snippets, storage layout, cleanup scripts.
 - `.squad/decisions/inbox/wufei-dependency-caching.md` — team decision record with Heero action items.
+
+### 2026-04-10: UART Result Protocol and GitHub output format
+
+Designed the complete wire protocol between MCU test firmware and the Pi parser, and the GitHub
+Actions Step Summary rendering format.
+
+**Protocol design decisions:**
+- Line-based ASCII text (not binary) — human-readable with any serial monitor, easy to
+  implement on bare-metal RP2040/RP2350 without printf complexity.
+- 115200 baud 8N1 — reliable on Pi 5 PL011 and RP2040/RP2350 without fractional divider
+  edge cases; ~140 ms for a 200-test run, negligible overhead.
+- LF-only line endings — avoids CRLF stripping boilerplate in the parser.
+- 256-byte max line length — safe for all MCU UART FIFO sizes.
+- Free-text fields always last, colon-prefixed — avoids needing quoted strings or escaping
+  spaces; simple `partition(':')` in the parser.
+- 7 message types: TEST_START, PASS, FAIL, SKIP, METRIC, LOG, TEST_END — covers all needed
+  result categories without overengineering.
+- METRIC is not pass/fail — surfaced separately in GitHub Summary as a performance table.
+- LOG lines are valid in normal mode, rejected in strict mode — supports firmware debug traces
+  without polluting test results.
+- Timeout detection is entirely parser-side (watchdog on inter-line silence) — firmware does
+  not need a heartbeat mechanism.
+
+**GitHub output design decisions:**
+- `<details>` collapsible sections per MCU — avoids wall-of-text for large test suites.
+- Emoji status at a glance in both overview table and section headers.
+- FAIL table adds Error column; PASS-only tables omit it — keeps clean output when no failures.
+- Duration displayed in human-readable ms/s form (converted from protocol's raw microseconds).
+- Metrics in a separate sub-table — clear separation between pass/fail and performance data.
+- Timed-out MCUs show tests received before timeout — partial data is better than nothing.
+
+**Deliverables produced:**
+- `docs/hardware/uart-result-protocol.md` — full protocol spec (firmware dev contract)
+- `docs/hardware/github-output-format.md` — GitHub Step Summary template with example data
+- `scripts/mcu/validate-uart-output.py` — protocol validator / debug utility
+- `scripts/performance/cache-metrics/README.md` — updated with MCU metrics future section
+- `.squad/decisions/inbox/wufei-uart-protocol-design.md` — team decision record
+
+### 2026-04-11: UART protocol revised for single-stream topology
+
+Fortinbra clarified the finalized hardware topology: the **harness RP2040** aggregates results
+from all three DUT MCUs (RP2040-0, RP2350A, RP2350B) and reports them over **one UART** to the
+Pi host. Previous protocol design assumed 4 independent UARTs (one per MCU).
+
+**Topology update:**
+- Single UART from harness RP2040 to Pi (e.g., `/dev/ttyAMA2` — exact pin TBD by Treize)
+- Three DUT MCUs communicate results to harness MCU via on-HAT wiring (not directly to Pi)
+- Pi parser receives one serial stream containing aggregated results
+
+**Protocol revisions:**
+- All result messages (PASS, FAIL, SKIP, METRIC, LOG) now **require** an `mcu=<id>` field
+  to identify which DUT the result came from (essential for correct routing in single stream)
+- TEST_START and TEST_END still include `mcu=<id>` to mark run boundaries per DUT
+- Parser must maintain per-DUT state and route results by matching `mcu` field
+- Single timeout watchdog architecture now tracks per-DUT silence separately
+
+**Documentation updated:**
+- `docs/hardware/uart-result-protocol.md` — replaced 4-UART references with single-stream model
+- `docs/hardware/github-output-format.md` — updated wording for harness aggregation
+- `scripts/mcu/validate-uart-output.py` — enforces `mcu` field presence on all result messages
+
+**Validator testing:**
+- Verified validator accepts correct single-stream captures (e.g., sequential per-DUT reports)
+- Verified validator rejects PASS/FAIL/SKIP/METRIC/LOG lines missing `mcu` field (protocol error)

@@ -1,0 +1,65 @@
+name: MCU Performance Tests
+# Example workflow for running firmware performance tests on the PerformanceNode HAT.
+#
+# NOTE: This example currently runs directly on the Pi host so OpenOCD and UART
+# tools come from the host setup scripts. Device passthrough for fully
+# containerised MCU jobs is tracked separately in the GPIO/HAT workstream.
+# See docs/hardware/hat-design-contract.md for HAT setup and wiring details.
+#
+# Prerequisites on the runner:
+#   1. The actions-runner user must be in: gpio, dialout groups
+#   2. MCU deps installed: sudo ./scripts/mcu/setup-mcu-deps.sh
+#   3. GPIO wiring per the HAT design (see hat-design-contract.md when published)
+#   4. UF2 firmware files produced by the build step as firmware/{target}.uf2
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'firmware/**'
+
+jobs:
+  mcu-tests:
+    runs-on: [self-hosted, linux, arm64, performancenode]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build firmware
+        # Replace with your actual firmware build step.
+        # This step should produce firmware/{target}.elf (or .uf2) for each MCU target:
+        #   firmware/rp2040-h.elf
+        #   firmware/rp2040-d.elf
+        #   firmware/rp2350b-d.elf
+        #   firmware/rp2350a-d.elf
+        run: |
+          echo "Replace with your firmware build step"
+          echo "Example: cmake --build build/ --target all"
+
+      - name: Run MCU performance tests
+        id: mcu-tests
+        uses: ./.github/actions/mcu-test
+        with:
+          firmware-rp2040-h: './firmware/rp2040-h.elf'
+          firmware-rp2040-d: './firmware/rp2040-d.elf'
+          firmware-rp2350b-d: './firmware/rp2350b-d.elf'
+          firmware-rp2350a-d: './firmware/rp2350a-d.elf'
+          uart-timeout: '60'
+
+      - name: Check results
+        run: |
+          echo "Passed: ${{ steps.mcu-tests.outputs.passed }}"
+          echo "Failed: ${{ steps.mcu-tests.outputs.failed }}"
+          echo "Summary: ${{ steps.mcu-tests.outputs.summary }}"
+          if [ "${{ steps.mcu-tests.outputs.failed }}" != "0" ]; then
+            echo "::error::${{ steps.mcu-tests.outputs.summary }}"
+            exit 1
+          fi
+
+      - name: Upload UART logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uart-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}/mcu-uart-output/
+          if-no-files-found: warn
+          retention-days: 14

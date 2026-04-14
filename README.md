@@ -1,8 +1,27 @@
 # PerformanceNode
 
-**Status:** 🔄 Rebooting — Ansible-first architecture. See `docs/architecture/ansible-reboot-proposal.md`.
+**Status:** 📋 Planning — Staged rollout approved for Ansible-first architecture.
 
 An **Ansible-based automation framework** for setting up Raspberry Pi 5 as a self-hosted GitHub Actions runner for local performance testing. Designed for reproducibility, idempotency, and extensibility to other network hosts.
+
+## Staged Rollout
+
+Implementation is broken into **8 small stages** for incremental review and approval:
+
+| Stage | Name | Status |
+|-------|------|--------|
+| 1 | [Inventory & Bootstrap](docs/specs/0007-inventory-bootstrap.md) | 📝 Draft |
+| 2 | [Common Base](docs/specs/0008-common-role.md) | 📝 Draft |
+| 3 | [Docker Runtime](docs/specs/0009-docker-role.md) | 📝 Draft |
+| 4 | GitHub Runner Core | Pending |
+| 5 | Container Hooks | Pending |
+| 6 | Cache Infrastructure | Pending |
+| 7 | Validation | Pending |
+| 8 | Documentation | Pending |
+
+**Process:** Each stage requires spec approval → GitHub issue → implementation → validation.
+
+See [`docs/architecture/staged-rollout.md`](docs/architecture/staged-rollout.md) for the full plan.
 
 ## Architecture
 
@@ -13,9 +32,10 @@ inventories/          # Production/development host inventories
 playbooks/            # Ansible playbooks (pi-runner.yml, site.yml)
 roles/                # Reusable roles (common, docker, github_runner, runner_hooks, caching)
 docs/architecture/    # Architecture proposals and decisions
+docs/specs/           # Feature specifications (spec-driven development)
 ```
 
-See [`docs/architecture/ansible-reboot-proposal.md`](docs/architecture/ansible-reboot-proposal.md) for the full proposal.
+See [`docs/architecture/ansible-reboot-proposal.md`](docs/architecture/ansible-reboot-proposal.md) for the full architecture proposal.
 
 ## Team
 

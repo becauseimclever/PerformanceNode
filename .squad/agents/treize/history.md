@@ -150,3 +150,52 @@ Created `archive/main-2026-04-13` (commit de6a291) with full Phase 1 implementat
 **Status:** Proposal awaiting Fortinbra approval. Spec gate remains: no implementation without `0007-ansible-pi-runner-role.md` spec + GitHub issue.
 
 **Pattern reinforced:** When pivoting automation strategy, keep architectural decisions but change implementation vehicle. The "what" (container hooks, caching, SSH) remains valid; only "how" (shell → Ansible) changes. Preserves design work while gaining benefits of new tooling.
+
+### 2026-04-14: Staged Rollout Plan Created
+
+**Directive from Fortinbra:** "Split implementation into small understandable chunks for incremental approval."
+
+**What was created:**
+- `docs/architecture/staged-rollout.md` — Master plan defining 8 stages with dependencies and rationale
+- `docs/specs/TEMPLATE.md` — Spec template for staged specs
+- `docs/specs/0007-inventory-bootstrap.md` — Stage 1 spec (Ansible connectivity)
+- `docs/specs/0008-common-role.md` — Stage 2 spec (SSH, packages, runner user)
+- `docs/specs/0009-docker-role.md` — Stage 3 spec (Docker CE installation)
+- `.squad/decisions/inbox/treize-staged-rollout.md` — Decision record for the staged approach
+- Updated `README.md` to show staged rollout status
+
+**Eight stages defined:**
+
+| Stage | Name | Key Deliverable |
+|-------|------|-----------------|
+| 1 | Inventory & Bootstrap | `ansible.cfg`, inventory, connectivity |
+| 2 | Common Base | `roles/common/` — SSH, packages, user |
+| 3 | Docker Runtime | `roles/docker/` — Docker CE, config |
+| 4 | GitHub Runner Core | `roles/github_runner/` — registration |
+| 5 | Container Hooks | `roles/runner_hooks/` — isolation |
+| 6 | Cache Infrastructure | `roles/caching/` — bind mounts |
+| 7 | Validation | Idempotency + smoke test |
+| 8 | Documentation | README, runbook |
+
+**Key design decisions:**
+- Each stage ~1–2 hours of implementation work
+- Clear dependency chain (no circular dependencies)
+- Explicit approval gate before each stage begins
+- Spec + GitHub issue required per stage
+- First 3 stages establish foundation (connectivity, OS baseline, container runtime)
+
+**Pattern learned:** When users want to follow along with implementation, break work into stages that each produce visible, verifiable output. Stages should be small enough to review in one sitting (~2 hours max). The approval gate between stages builds trust incrementally and catches misalignment early.
+
+**Pattern learned:** Stage boundaries should align with "what does this prove" milestones:
+- Stage 1 proves: Ansible can reach the Pi
+- Stage 2 proves: OS is secure and ready
+- Stage 3 proves: Containers can run
+- Stage 4 proves: Jobs can be picked up
+- Stage 5 proves: Jobs are isolated
+- Stage 6 proves: Caches work
+- Stage 7 proves: Full stack operational
+- Stage 8 proves: User can operate independently
+
+Each stage unlocks a capability that the next stage builds on. This creates natural checkpoints where the user can assess progress and decide whether to continue.
+
+**Status:** Staged rollout plan created. Specs 0007–0009 drafted. All stages awaiting Fortinbra approval before implementation begins.

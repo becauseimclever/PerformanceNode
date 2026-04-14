@@ -199,3 +199,31 @@ Created `archive/main-2026-04-13` (commit de6a291) with full Phase 1 implementat
 Each stage unlocks a capability that the next stage builds on. This creates natural checkpoints where the user can assess progress and decide whether to continue.
 
 **Status:** Staged rollout plan created. Specs 0007–0009 drafted. All stages awaiting Fortinbra approval before implementation begins.
+
+### 2026-04-14: WSL/Ubuntu Control Node Requirement Documented
+
+**Directive from Fortinbra:** "Ansible does not run well from Windows, so we will need to use the WSL instance running Ubuntu as the control."
+
+**Response:**
+- Updated `docs/architecture/ansible-reboot-proposal.md` with "Operator Workflow" section explaining:
+  - WSL 2 + Ubuntu 22.04 LTS requirement
+  - Typical setup (one-time `apt install ansible`)
+  - Command flow (navigate repo path in WSL, run playbooks from WSL terminal)
+  - Why: File permissions, SSH key strictness, module behavior all require POSIX environment
+
+- Updated `docs/architecture/staged-rollout.md` with:
+  - Prominent ⚠️ warning at top: "All Ansible playbook execution must happen inside Ubuntu WSL terminal"
+  - Link to operator workflow for detailed setup
+  - Note that this requirement affects all 8 stages
+
+- Updated `README.md` staged rollout section:
+  - Added reminder about WSL requirement
+  - Link to ansible-reboot-proposal.md#operator-workflow
+
+- Created decision record at `.squad/decisions/inbox/treize-wsl-control.md`:
+  - Problem statement, decision, rationale (5 points)
+  - Implications for operators, docs, and implementation
+  - Alternatives considered and rejected
+  - Status: Firm constraint, not preference
+
+**Key learning:** When infrastructure constraints emerge (like "Ansible needs Unix control node"), document them at the architecture level, not just in runbooks. Propagate the constraint through all related docs (proposals, rollout, README) so operators encounter the requirement consistently. Decision record captures why the constraint exists (for future agents' context).

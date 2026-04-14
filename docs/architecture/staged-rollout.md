@@ -6,6 +6,20 @@
 
 ---
 
+## Important: WSL/Ubuntu Control Node Requirement
+
+**⚠️ All Ansible playbook execution must happen inside a Ubuntu WSL terminal, not from Windows Command Prompt or PowerShell.**
+
+Before beginning ANY stage implementation, ensure:
+1. WSL 2 with Ubuntu 22.04 LTS or later is installed on Windows
+2. Ansible is installed in Ubuntu: `sudo apt install ansible openssh-client`
+3. Repository is cloned (to Windows or WSL — both work)
+4. All playbook commands are run from **inside WSL terminal** only
+
+See [Operator Workflow](ansible-reboot-proposal.md#operator-workflow) in the Ansible Reboot Proposal for detailed setup and typical workflow.
+
+---
+
 ## Purpose
 
 Break the Ansible-first Pi runner implementation into **8 small, understandable stages** that can be reviewed and approved incrementally. Each stage has a focused scope, clear acceptance criteria, and explicit approval gate.

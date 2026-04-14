@@ -21,6 +21,8 @@ Implementation is broken into **8 small stages** for incremental review and appr
 
 **Process:** Each stage requires spec approval → GitHub issue → implementation → validation.
 
+⚠️ **Important:** All Ansible playbook execution must happen inside a Ubuntu WSL terminal, not from Windows. See [`docs/architecture/ansible-reboot-proposal.md`](docs/architecture/ansible-reboot-proposal.md#operator-workflow) for setup instructions.
+
 See [`docs/architecture/staged-rollout.md`](docs/architecture/staged-rollout.md) for the full plan.
 
 ## Architecture

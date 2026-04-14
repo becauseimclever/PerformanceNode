@@ -11,12 +11,58 @@
 
 Reframe PerformanceNode as an **Ansible-first automation repository** instead of raw shell scripts. The first scope covers only the Raspberry Pi 5 self-hosted GitHub Actions runner; the structure is designed to extend to other systems on the network in future phases.
 
+**⚠️ IMPORTANT: Control Node Requirement — Ansible must be executed from Ubuntu in WSL (Windows Subsystem for Linux), not directly from Windows.** The repository may be cloned to Windows, but all Ansible playbooks, inventory management, and execution must happen inside a WSL Ubuntu terminal. See [Operator Workflow](#operator-workflow) below.
+
 **Why Ansible:**
 - **Idempotent by design** — Ansible modules naturally handle "already done" cases
 - **Declarative & auditable** — YAML playbooks are easier to review than procedural shell scripts
 - **Inventory-driven** — Easy to target one Pi now, add more hosts later
 - **Role-based composition** — Encapsulate concerns (Docker, runner, caching) into reusable roles
 - **Extensibility** — Add network switches, NAS, workstations to inventory without restructuring
+
+---
+
+## Operator Workflow
+
+**⚠️ WSL/Ubuntu Control Node Requirement**
+
+The PerformanceNode repository may live anywhere (Windows local drive, network path, WSL filesystem), but **Ansible execution must always happen from within a Ubuntu WSL terminal**, never from Windows Command Prompt or PowerShell.
+
+### Setup (One Time)
+1. **Ensure WSL 2 is installed** on Windows with Ubuntu 22.04 LTS or later
+2. **Inside Ubuntu WSL terminal:**
+   ```bash
+   # Install Ansible and dependencies
+   sudo apt update && sudo apt install -y ansible openssh-client
+   ```
+
+### Typical Workflow
+1. **Clone repo** (on Windows or in WSL — both work)
+   ```bash
+   # Example: Windows C:\ws\PerformanceNode OR ~/performancenode in WSL
+   git clone https://github.com/fortinbra/PerformanceNode.git
+   cd PerformanceNode
+   ```
+
+2. **Open Ubuntu WSL terminal** (Windows Terminal, or `wsl ubuntu` from Command Prompt)
+
+3. **Navigate to repo** (if on Windows, use WSL path: `/mnt/c/ws/PerformanceNode`)
+   ```bash
+   cd /mnt/c/ws/PerformanceNode  # If cloned on Windows
+   # OR
+   cd ~/performancenode           # If cloned in WSL
+   ```
+
+4. **Run Ansible from WSL terminal**
+   ```bash
+   ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
+   ```
+
+### Why Ubuntu WSL and Not Windows?
+- **Ansible requires Unix-like environment** — file permissions, SSH client behavior, shell scripts, and module execution all assume Linux/POSIX semantics
+- **Windows cmd.exe and PowerShell don't provide this** — module failures, path handling errors, and shell quoting issues occur
+- **WSL 2 provides full compatibility** — all Ansible tools and dependencies (openssh-client, jinja2, netaddr, etc.) work identically to native Linux
+- **Easier SSH management** — SSH keys in WSL follow standard Unix paths; authorized_keys validation is reliable
 
 ---
 
@@ -126,19 +172,29 @@ Secrets managed via **Ansible Vault** (encrypted `host_vars` or separate `vault.
 
 ## Playbook Execution Model
 
+**All Ansible commands must be executed inside a Ubuntu WSL terminal, not from Windows.**
+
 ```bash
+# CORRECT: Run from Ubuntu WSL terminal
+# (Inside WSL, repository can be at /mnt/c/... or ~/... )
+$ ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
+
 # Full Pi 5 runner setup (first run)
-ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
+$ ansible-playbook -i inventories/production playbooks/pi-runner.yml --ask-vault-pass
 
 # Re-run (idempotent — skips completed tasks)
-ansible-playbook -i inventories/production playbooks/pi-runner.yml
+$ ansible-playbook -i inventories/production playbooks/pi-runner.yml
 
 # Target only Docker role
-ansible-playbook -i inventories/production playbooks/pi-runner.yml --tags docker
+$ ansible-playbook -i inventories/production playbooks/pi-runner.yml --tags docker
 
 # Limit to single host (future)
-ansible-playbook -i inventories/production playbooks/site.yml --limit pi5-runner
+$ ansible-playbook -i inventories/production playbooks/site.yml --limit pi5-runner
+
+# INCORRECT: Do NOT run from Windows Command Prompt or PowerShell
+X ansible-playbook -i inventories/production playbooks/pi-runner.yml  # ← Will fail
 ```
+
 
 ---
 
